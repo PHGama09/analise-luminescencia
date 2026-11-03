@@ -124,6 +124,8 @@ entradas:
   caminhos: [cl, c0]          # cl, c0 ou os dois (treinar com só cl, só c0 e ambos)
   canais_sem_po: true         # true = todo canal com ajuste entra (treino "com"). false = só canal com sinal forte (treino "sem"; precisa do limiar)
   limiar_inicio_corr: null    # com canais_sem_po: false, ex.: {R: 40, G: 150, B: 150}. Regra MEDIDA no vídeo; os níveis se sobrepõem (ver entradas.py)
+  descritores: false          # Q3 (03/11/2026): true = acrescenta os descritores sem modelo (descritores.csv) às entradas. Nunca meta, alvo ou canal_ativo_*
+  descritores_sem_nao_confiaveis_R: false   # true = tira R_md_t10, R_md_r_20s, R_md_r_40s (lista em descritores.nao_confiaveis_R); false mantém todas (Q2)
 
 descritores:
   # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.
@@ -133,3 +135,22 @@ descritores:
   suavizacao_pontos: 5            # mediana móvel só para achar cruzamentos e ler valores em tempos fixos
   k_ruido_nivel: 3.0              # nível-alvo precisa passar de k x ruído do canal para o cruzamento valer
   nao_confiaveis_R: [t10, r_20s, r_40s]   # Q2 (03/11/2026): só AVISO no dicionario_descritores.csv (no R o sinal chega ao ruído); a coluna continua na tabela
+
+offset:
+  # P5 (03/11/2026, offset.py): teste do offset cantos - ROI. Só análise.
+  limiar_vazamento: 3.0       # canal 'sem sinal' = perto do ruído e nível inicial a menos disto acima do canto (níveis)
+  tolerancia_offset: 1.0      # erro do offset (medido - controle) aceito no relatório (níveis)
+
+# P6a (03/11/2026, tudo.py): comando `luminescencia tudo`. Relatório de cada etapa, relativo a pastas.saida (recebe o carimbo de versão).
+tudo:
+  rtol: 1.0e-3           # P6b: tolerância relativa da conferência de regressão (mediana/média; contagens são exatas)
+  atol: 1.0e-9           # P6b: tolerância absoluta (valores perto de 0)
+  etapas:
+    consolidar: consolidacao/relatorio_consolidacao.txt
+    pos: posprocessamento/relatorio_posprocessamento.txt
+    modelar: modelagem/relatorio_modelagem.txt
+    tabela: tabela/relatorio_tabela.txt
+    comparar_modelos: modelagem/relatorio_comparacao_modelos.txt
+    descritores: tabela/relatorio_descritores.txt
+    offset: offset/relatorio_offset.txt
+    graficos: graficos/graficos_resumo.txt

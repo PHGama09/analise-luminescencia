@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from .config import carregar_config
+from .tudo import NOMES_ETAPAS
 
 
 def _cmd_auditar(args, cfg):
@@ -91,10 +92,37 @@ def _cmd_descritores(args, cfg):
     return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, saida=args.saida)
 
 
+def _cmd_offset(args, cfg):
+    from .offset import rodar
+
+    return rodar(cfg, pasta_extracao=args.extracao, pasta_consolidacao=args.consolidacao, saida=args.saida)
+
+
 def _cmd_graficos(args, cfg):
     from .graficos import rodar
 
     return rodar(cfg, pasta_modelagem=args.modelagem, pasta_pos=args.pos, saida=args.saida)
+
+def _cmd_deriva(args, cfg):
+    from luminescencia import deriva
+    res = deriva.analisar_deriva()
+    print("Análise de deriva concluída com sucesso:", res)
+    return 0
+
+def _cmd_colinearidade(args, cfg):
+    from luminescencia import colinearidade
+    pares = colinearidade.analisar_colinearidade()
+    print("Análise de colinearidade concluída. Pares encontrados:", pares)
+    return 0
+
+def _cmd_tudo(args, cfg):
+    from .tudo import rodar
+
+    return rodar(
+        cfg, de=args.de, ate=args.ate, com_offset=args.com_offset, parar_no_erro=args.parar_no_erro,
+        config_path=args.config, conferir=args.conferir, gravar_referencia=args.gravar_referencia,
+        so_conferir=args.so_conferir,
+    )
 
 
 def _nao_implementado(nome):
@@ -186,6 +214,34 @@ def main(argv=None) -> int:
     p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/graficos)")
     p.set_defaults(func=_cmd_graficos)
+
+    p = sub.add_parser("offset", parents=[comum], help="P5. Testa a suposição do preto por vídeo (offset cantos - ROI) nos canais sem sinal (só análise)")
+    p.add_argument("--extracao", help="pasta da extração (padrão: output/extracao)")
+    p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/offset)")
+    p.set_defaults(func=_cmd_offset)
+
+    p = sub.add_parser("deriva", parents=[comum], help="B5. Análise de deriva de sessão A/B/C por proporção")
+    p.add_argument("--dataset", help="dataset.csv a usar (padrão: dataset.csv)")
+    p.add_argument("--descritores", help="descritores.csv a usar (padrão: descritores.csv)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/deriva)")
+    p.set_defaults(func=_cmd_deriva)
+
+    p = sub.add_parser("colinearidade", parents=[comum], help="B13. Análise de correlação e colinearidade das entradas")
+    p.add_argument("--dataset", help="dataset a usar")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade)")
+    p.set_defaults(func=_cmd_colinearidade)
+
+    p = sub.add_parser("tudo", parents=[comum], help="6e. Roda a cadeia consolidar -> ... -> graficos e carimba a versão nos relatórios")
+    p.add_argument("--de", choices=NOMES_ETAPAS, help="primeira etapa a rodar (padrão: consolidar)")
+    p.add_argument("--ate", choices=NOMES_ETAPAS, help="última etapa a rodar (padrão: graficos)")
+    p.add_argument("--com-offset", action="store_true", help="inclui a etapa offset depois de descritores")
+    p.add_argument("--parar-no-erro", action=argparse.BooleanOptionalAction, default=True,
+                   help="interrompe na primeira etapa com código != 0 (padrão: sim; --no-parar-no-erro continua)")
+    p.add_argument("--conferir", action="store_true", help="após rodar, confere o output com tests/referencia/referencia.json (código != 0 se divergir)")
+    p.add_argument("--gravar-referencia", action="store_true", help="após rodar, grava tests/referencia/referencia.json a partir do output atual")
+    p.add_argument("--so-conferir", action="store_true", help="só confere o output atual com a referência, sem rodar etapas")
+    p.set_defaults(func=_cmd_tudo)
 
     args = parser.parse_args(argv)
     if not args.comando:

@@ -1,0 +1,1 @@
+## A análise de deriva confirmou que as variações entre as amostras A, B e C encontram-se majoritariamente abaixo do CV de regravação, permitindo o treino combinado A+B com validação cega em C. O estudo de colinearidade mapeou pares altamente correlacionados (como $\tau_{cl}$ e $\tau_{c0}$), fundamentando a seleção de subconjuntos independentes de entradas.

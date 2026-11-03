@@ -1,0 +1,26 @@
+TESTE DO OFFSET CANTOS - ROI (P5; só análise, nada do pipeline muda)
+======================================================================
+Offset do controle (canto - dentro da ROI): R 0.87  G 0.79  B 1.03
+
+Canais sem sinal (regra medida: perto do ruído e início < 3 níveis acima do canto):
+  B: 14 vídeos (A: 5, B: 4, C: 5)
+     offset medido: média 1.10, mediana 0.95, dp 0.62   (controle 1.03)
+     erro contra o controle: média +0.07, dp 0.62; dentro de ±1 nível: 13/14
+     sem o pior vídeo (R_15_v4b, erro +2.00): dp 0.29
+     por amostra (média, dp, n): A: 0.94, 0.39, 5   B: 1.53, 1.03, 4   C: 0.91, 0.23, 5
+     diferença entre amostras (Kruskal-Wallis): p = 0.50   (poucos vídeos por amostra: pouco poder para achar diferença pequena)
+     5 vídeos com o canto no piso mínimo da extração (1): o canto real pode ser menor e o offset medido fica distorcido
+  G: 2 vídeos (B: 2)
+     poucos vídeos para estatística (menos de 5): ignorado nas conclusões
+
+O offset é constante? Reta final_ROI = a + b x canto (só cantos acima do piso mínimo; b = 1 se o offset fosse constante):
+  B: n = 9   b = 0.45, a = -0.14, r = 0.97
+
+Efeito na dispersão do nível final entre as regravações (dp, níveis; canais com o pó; menor = melhor):
+  piso fixo                           R 1.32  G 2.18  B 3.62
+  atual (canto - offset do controle)  R 0.45  G 1.29  B 2.91
+  alternativa a + b x canto           R 0.85  G 1.75  B 3.26
+
+Como ler: o offset do controle vale, em média, para o canal testado se o erro médio estiver perto de 0. Se b ficar bem abaixo de 1, o offset NÃO é
+constante (o ROI sobe menos que os cantos), e a correção por vídeo erra mais nos vídeos com cantos muito acima do controle. A alternativa linear só
+vale se reduzir a dispersão acima; calibrada com poucos pontos de um só canal, ela não deve substituir a correção atual sem mais dados.

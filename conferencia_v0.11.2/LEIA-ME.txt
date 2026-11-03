@@ -1,0 +1,35 @@
+Esta pasta NÃO vai para o repositório. São os resultados do assistente (executor de 1 CPU, Python 3.12, numpy 2.4, pandas 3.0, scipy 1.17)
+com os seus CSVs reais, para você conferir na sua máquina depois de copiar o zip e rodar, nesta ordem:
+  pytest                       (esperado: 85 passed)
+  luminescencia modelar
+  luminescencia tabela
+  luminescencia comparar_modelos
+  luminescencia descritores
+  luminescencia graficos
+(o 'pos' não mudou). Diferença de fim de linha não conta; diferença numérica < ~0,001 em tau e nas colunas da tabela é aceitável.
+
+Números-chave (v0.11.0, modelagem.c_livre_c_minimo = -1.35):
+  ajustes 3933; c_livre dupla 650 / simples 1; colados no limite: R 6 de 227 (3%), G 0, B 0
+  CV do tau c_livre: R 11,8 / G 3,7 / B 4,5 %;  sensibilidade c_livre no R 6,2 % (viés -0,6 %)
+  placar cl (BIC): R dupla 201 / potência 14 / esticada 12;  G 197 / 12 / 3;  B 190 / 20 / 2
+  dataset.csv 236 x 106 (só 18 colunas R_cl_* e B_cl_* diferem do da v0.10.0);  descritores.csv idêntico ao da v0.10.0
+  dicionario_descritores.csv: 3 avisos (R_md_t10, R_md_r_20s, R_md_r_40s)
+  graficos_resumo.txt: razão tarde/cedo (c0/cl)  ln_t R 0,69/0,69 G 0,38/0,49 B 0,36/0,49;  loglog R 1,50/1,48 G 1,61/2,06 B 1,53/2,05;
+                       inverso R 1,59/1,53 G 1,24/2,02 B 1,02/1,81
+Arquivos alterados: __init__.py, cli.py, graficos.py, tabela.py, descritores.py, README.md, config.yaml, requirements.txt, pyproject.toml
+Arquivos novos: tests/test_graficos_transformacoes.py (e 1 teste novo em test_tabela.py e 1 em test_descritores.py)
+
+v0.11.1 (Q3): entradas.py agora aceita entradas.descritores (padrão false). Resultado nos seus dados (output/tabela): entradas com a chave desligada 236 x 90
+(idêntico à v0.11.0); ligada 236 x 129; com descritores_sem_nao_confiaveis_R 236 x 126. Nenhuma coluna meta, prop_*, canal_ativo_* ou usar_no_ajuste_*.
+Para conferir: python -c "from luminescencia.config import carregar_config; from luminescencia.entradas import carregar_entradas as c; print(c(carregar_config()).shape)"
+Arquivos novos/alterados nesta versão: src/luminescencia/entradas.py, tests/test_entradas.py (+6 testes), config.yaml, README.md, __init__.py, pyproject.toml.
+O zip é cumulativo (inclui tudo da v0.11.0), então serve mesmo que você ainda não tenha copiado o da v0.11.0.
+
+v0.11.2 (P5): novo comando 'luminescencia offset' (só análise; lê extracao_resumo.csv e videos.csv, grava output/offset/).
+Para conferir: luminescencia offset  e compare com relatorio_offset.txt desta pasta. Números-chave:
+  offset do controle R 0,87 / G 0,79 / B 1,03;  canal sem sinal (regra medida): B em 14 vídeos de R_15 (G só 2: ignorado)
+  offset medido B: média 1,10, mediana 0,95, dp 0,62; erro contra o controle +0,07; 13/14 dentro de +-1; sem R_15_v4b dp 0,29
+  Kruskal-Wallis entre amostras p = 0,50;  reta final_ROI = -0,14 + 0,45 x canto (n = 9, r = 0,97)
+  dispersão do nível final: piso fixo 1,32/2,18/3,62; atual 0,45/1,29/2,91; alternativa linear 0,85/1,75/3,26
+Arquivos novos/alterados nesta versão: src/luminescencia/offset.py (novo), cli.py, tests/test_offset.py (novo, 5 testes), config.yaml (seção offset),
+README.md, __init__.py, pyproject.toml. O zip é cumulativo (inclui tudo das v0.11.0 e v0.11.1).

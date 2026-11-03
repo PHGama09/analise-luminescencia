@@ -110,7 +110,12 @@ def descritores_serie(t, y, p: dict, k: float, janela: int, dur_min: float) -> d
         m = tt < H
         grade = np.append(tt[m], H)
         valores = np.append(yy[m], np.interp(H, tt, yy)) / i0
-        L[nome] = float(np.trapezoid(valores, grade) if hasattr(np, "trapezoid") else np.trapz(valores, grade))
+        try:
+            from scipy.integrate import trapezoid
+            L[nome] = float(trapezoid(valores, grade))
+        except ImportError:
+            # Se o scipy não estiver disponível, fazemos a integração trapezoidal manualmente por segurança
+            L[nome] = float(np.sum((valores[:-1] + valores[1:]) * np.diff(grade) / 2))
     return L
 
 
@@ -141,11 +146,23 @@ def calcular(series: pd.DataFrame, vpos: pd.DataFrame, cfg: dict, inicio: float 
             L[f"{c}_{PREFIXO}_ok"] = r is not None
             for k in cols:
                 L[f"{c}_{PREFIXO}_{k}"] = r.get(k, np.nan) if r else np.nan
-        for a, b in PARES:                                           # razões entre canais
+        for a, b in PARES:                                       # razões entre canais
             for k in ("I0", "t50"):
-                ra, rb = achou[a], achou[b]
-                ok = ra is not None and rb is not None and k in ra and ra[k] == ra[k] and rb[k] == rb[k] and rb[k] != 0
-                L[f"razao_{k}_{a}_{b}"] = ra[k] / rb[k] if ok else np.nan
+                ra, rb = achou.get(a), achou.get(b)
+                if (
+                    ra is not None 
+                    and rb is not None 
+                    and isinstance(ra, dict) 
+                    and isinstance(rb, dict)
+                    and k in ra 
+                    and k in rb 
+                    and ra[k] == ra[k] 
+                    and rb[k] == rb[k] 
+                    and rb[k] != 0
+                ):
+                    L[f"razao_{k}_{a}_{b}"] = ra[k] / rb[k]
+                else:
+                    L[f"razao_{k}_{a}_{b}"] = np.nan
         linhas.append(L)
     return pd.DataFrame(linhas)
 
