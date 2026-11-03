@@ -1,0 +1,86 @@
+# Configuração compartilhada por todas as etapas do projeto.
+# Valores "null" significam "não conferir".
+
+protocolo:
+  fps_esperado: 15            # padrão do protocolo (referência principal da auditoria)
+  fps_tolerancia: 0.5         # diferença aceita, em fps
+  modo_gravacao: experimento_completo   # o vídeo mostra os primeiros frames de excitação e o decaimento
+  instante_queda_s: 0.5       # só o ajuste de modelos (modelos.py) usa isto: o decaimento é ajustado a partir daqui.
+                              # A queda real fica em 0,20-0,40 s (mediana 0,33 s, 243 vídeos); 0,5 s deixa uma folga e
+                              # é o MESMO corte para todos os vídeos (não alinhar vídeo a vídeo, para não criar diferenças entre grupos).
+  duracao_esperada_s: 60      # vídeo mais curto ou mais longo que isso (± tolerância) vira problema
+  duracao_tolerancia_s: 1.0
+  amostras: [A, B, C]
+  videos_por_amostra: 5
+  resolucao_esperada: null    # ex.: [1920, 1080]; null = usa a mais comum do lote como alerta
+
+pastas:
+  videos: "G:/Meu Drive/Nova pasta"
+  saida: output
+
+nomes:
+  # Formato: <CORES>_<qtd>[_<qtd>[_<qtd>]]_v<N><letra>  ex.: GB_1_05_v1a (veja nomes.py)
+  controle: referencia        # palavra que identifica o vídeo de controle (sem luminescência)
+  soma_esperada: 1.5          # soma das quantidades dos pós; null = não conferir
+  soma_tolerancia: 0.01
+  extensoes: [".mp4", ".mov", ".avi", ".mkv", ".m4v"]
+
+auditoria:
+  jitter_tolerancia: 0.5
+  truncado_fracao: 0.98
+  duplicados_tolerancia: 0.05 # modo completo: acima disso na MEDIANA do lote, vira alerta do lote
+  duplicados_desvio: 0.03     # vídeo com % de frames idênticos diferente da mediana por mais que isso vira problema
+  workers: 6                  # vídeos auditados ao mesmo tempo
+  verificar_completude: false
+  pastas_ignoradas: ["Proporcao de Branco 6000"]   # nome da pasta (em qualquer nível); não são lidas nem listadas
+
+deteccao_queda:
+  # Procura o instante em que a luz de excitação apaga, só nos primeiros segundos do vídeo.
+  # Serve para VERIFICAR (não altera nada); quando falha, o vídeo vai para o bloco de revisão manual.
+  janela_inicio_s: 0
+  janela_fim_s: 1.0           # a queda deve estar entre 0 e 1 s
+  contexto_s: 0.5             # lê um pouco além da janela para ver o que vem depois da queda
+  fracao_brilho: 0.05         # o brilho de cada frame é a média dos 5% de pixels mais claros
+  queda_minima: 0.50          # queda mínima de brilho (média de 3 frames antes contra 3 depois), em fração do anterior (medido: 0,86-0,997)
+  desvio_lote_s: 0.15         # queda detectada a mais que isso da mediana dos vídeos vai para a revisão (medido: até 0,13 s)
+divisao:
+  # Só para conferência visual (coluna "grupo" do relatório). Derivada da letra da amostra.
+  treino: [A, B]
+  validacao: [C]
+
+curadoria:
+  arquivo: curadoria.csv      # suas decisões por vídeo; fica na raiz do projeto (não é apagado nem sobrescrito)
+  motivos: [erro_de_gravacao, duracao_invalida, queda_nao_detectada, nome_errado, pasta_errada,
+            video_duplicado, condicao_diferente, qualidade_ruim, outro]
+
+ajuste:
+  # Colunas do CSV da extração que serão ajustadas (nomes provisórios, a confirmar na etapa 3).
+  canais: {R: media_R, G: media_G, B: media_B}
+  # Ordem de preferência (orientação do professor): exponencial simples é o ideal;
+  # se não servir, exponencial dupla.
+  modelos: [exp_simples, exp_dupla]
+  r2_minimo: 0.99             # R² mínimo para aceitar um modelo
+  delta_bic: 10               # ganho de BIC exigido para trocar o modelo simples pelo mais complexo
+  fracao_minima_componente: 0.05   # na dupla, cada componente deve ter pelo menos 5% da amplitude
+  separacao_minima_tau: 1.5        # na dupla, tau lento / tau rápido deve ser pelo menos isso
+  minimo_pontos: 8
+
+roi:
+  # Programa 2 (roi.py): a ROI é achada sozinha, depois que a luz de excitação apaga.
+  janela_s: [0.6, 1.5]        # quadros usados para achar a amostra (a queda máxima medida é 0,40 s)
+  margem_interna: 0.12        # a ROI usa 88% do raio detectado, para fugir da borda borrada
+  circularidade_minima: 0.85  # abaixo disso o vídeo vira suspeito
+  contraste_minimo: 3.0       # brilho dentro / fora do círculo
+  desvio_raio_lote: 0.25      # raio diferente da mediana do lote por mais que isso = suspeito (o centro NÃO é critério)
+  pico_minimo: 4.0            # abaixo disso a janela não tem brilho de amostra (controle)
+  workers: 6
+  mosaico: {colunas: 4, linhas: 6, largura_tile: 480}
+
+extracao:
+  # Programa 3 (extracao.py). O corte entre excitação e decaimento é protocolo.instante_queda_s (o mesmo para todos).
+  saturacao_limiar: 250       # pixel com algum canal >= isto conta como saturado (o B passa perto do teto nos primeiros ~2 s)
+  cantos_px: 80               # lado dos 4 quadrados de canto, longe da amostra, que medem o nível de preto da câmera
+  piso_minimo: 1.0
+  fator_ruido: 5.0            # canal perto do ruído: (amplitude inicial - piso do vídeo) < fator * piso (provisório)
+  janela_fim_s: 10            # o "nível final" do resumo é a mediana dos últimos tantos segundos
+  workers: 6

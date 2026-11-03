@@ -8,7 +8,7 @@ Transformar vídeos de amostras luminescentes em **dados numéricos limpos e com
 
 Os dados serão usados para **treinar um modelo de IA**. Por isso a prioridade do projeto não é só extrair números, e sim garantir que **todas as amostras sejam medidas do mesmo jeito**. Qualquer diferença sistemática entre grupos de vídeos (outro fps, outra exposição, outra distância da câmera) pode ser aprendida pelo modelo no lugar da diferença real entre as amostras.
 
-**O que são as amostras:** pós luminescentes em proporções diferentes de três componentes, identificados por amostra (A/B/C) e número do vídeo (1 a 5). O protocolo grava a fase de excitação e depois o decaimento (luz apagada perto dos 20 s), a cerca de 11 fps.
+**O que são as amostras:** pós luminescentes em proporções diferentes de três componentes, identificados por amostra (A/B/C) e número do vídeo (1 a 5). O protocolo grava a fase de excitação e depois o decaimento (luz de excitação apagada logo no início, entre 0,2 e 0,4 s de vídeo), em arquivos de 15 fps (cerca de 8 quadros novos por segundo reais, pois ~47% dos quadros se repetem).
 
 ## Visão geral
 
@@ -34,8 +34,15 @@ O pipeline é dividido em cinco programas independentes. Cada um lê a saída do
 Roda antes de tudo e pode ser repetida sempre que chegarem vídeos novos. Mostra primeiro os vídeos que nem puderam ser lidos (corrompidos ou truncados), e no final destaca os vídeos fora do padrão.
 
 - Leitura do nome do arquivo (proporção, amostra A/B/C, número do vídeo).
+  Erros de digitação simples (espaço, `__`, falta de `_` antes do `v`) são tolerados, mas o vídeo vai para o bloco de **revisão manual** com um nome sugerido. Nada é renomeado.
+- **Pasta contra nome:** se a pasta (`Amostras C/4/`) não bate com o nome (`..._v4a`), o vídeo vai para a revisão manual com a opinião do programa (nome errado, pasta errada ou vídeo extra), baseada em quais combinações já existem. Nada é movido ou renomeado sem você pedir.
+- **Detecção da queda:** procura, só nos primeiros segundos (`deteccao_queda` no config, hoje 0 a 1 s), o instante em que a luz de excitação apaga. É só verificação; quando falha, o vídeo vai para a revisão manual.
+- **Frames repetidos (modo `--completo`):** conta frames idênticos ao anterior e calcula `fps_efetivo` (frames novos por segundo). Se quase todos os vídeos têm a mesma fração, é um alerta do lote (característica do captador); só os vídeos que fogem da maioria viram problema. Nos vídeos atuais ~47% dos frames são repetidos (~8 frames novos por segundo, num arquivo de 15 fps).
+- **Grupo (treino/validação):** coluna `grupo` do relatório, derivada da letra da amostra (`divisao` no config: A e B treino, C validação). Só para conferência visual; vídeo com pasta diferente do nome fica `indefinido`.
+- **Curadoria (`curadoria.csv`):** suas decisões por vídeo (`incluir` sim/nao/pendente, `motivo` de uma lista fechada, `nome_aprovado`, `observacao`). O vídeo é identificado pelo hash do conteúdo, então renomear ou mover o arquivo não perde a decisão. A auditoria só acrescenta vídeos novos e atualiza caminho, status e `nome_sugerido`; suas colunas nunca são sobrescritas, e a versão anterior fica em `curadoria.csv.bak`.
+- **Pastas ignoradas** (`auditoria.pastas_ignoradas`): não são lidas. Hoje: `Proporcao de Branco 6000` (gravada com dados errados).
 - Metadados: fps real, número de frames, resolução, duração, codec, frames duplicados ou perdidos (jitter) e fps variável.
-- Comparação com o **padrão do protocolo** (por exemplo 11 fps), definido no arquivo de configuração. A **moda** entre os vídeos funciona como alerta secundário, para detectar lotes inteiros fora do padrão.
+- Comparação com o **padrão do protocolo** (15 fps), definido no arquivo de configuração. A **moda** entre os vídeos funciona como alerta secundário, para detectar lotes inteiros fora do padrão.
 - **Exposição automática:** quando disponíveis nos metadados, ISO, tempo de exposição e balanço de branco são conferidos. Câmeras de celular podem compensar o brilho quando a luz apaga, o que deforma a curva de decaimento. Se o vídeo não trouxer esses campos, o relatório informa "não disponível".
 
 ### 2. Detecção da amostra (ROI)
@@ -88,7 +95,7 @@ Tudo é opcional, configurável e reversível:
   - **Lab:** luminosidade (L) e dois eixos de cor (a: verde↔vermelho, b: azul↔amarelo). A distância entre cores se aproxima da diferença percebida (ΔE).
   - **Razão B/G:** divisão entre canais. Mostra direto qual componente decai mais rápido. Só faz sentido depois de linearizar a gama e subtrair o fundo.
 - **Métricas de análise:** desvio padrão, intensidade máxima, tempo para cair a X% e comparações entre amostras.
-- **Checagem de sincronização** (versão 1, forma simples): detecta o instante em que a luz apaga e compara com o tempo do protocolo. O desvio fica numa coluna de qualidade (`desvio_queda_s`), e vídeos acima da tolerância são marcados para revisão. **Isso não realinha o tempo.** Realinhar só entra se o usuário escolher, igual para todo o conjunto e registrado no arquivo auxiliar, porque realinhar só alguns vídeos criaria diferenças artificiais entre grupos.
+- **Checagem de sincronização** (versão 1, forma simples): detecta o instante em que a luz apaga (nos primeiros 1 s do vídeo) e compara com a mediana do lote. O desvio fica numa coluna de qualidade (`desvio_queda_s`), e vídeos acima da tolerância são marcados para revisão. **Isso não realinha o tempo.** Realinhar só entra se o usuário escolher, igual para todo o conjunto e registrado no arquivo auxiliar, porque realinhar só alguns vídeos criaria diferenças artificiais entre grupos.
 
 ### 6. Gráficos e ajuste de modelos (versão 2)
 
@@ -158,7 +165,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`. A versão 2 deve exigir também `scipy`. Os vídeos não ficam no repositório.
+Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `scipy`. Os vídeos não ficam no repositório.
 
 ## Pontos em aberto
 

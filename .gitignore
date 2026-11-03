@@ -7,3 +7,5 @@ output/
 *.mov
 *.avi
 .vscode/
+*.egg-info/
+.pytest_cache/
