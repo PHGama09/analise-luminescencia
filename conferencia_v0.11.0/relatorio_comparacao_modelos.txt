@@ -1,0 +1,64 @@
+COMPARAÇÃO DE MODELOS DE DECAIMENTO (só análise; o caminho principal não muda)
+======================================================================
+Sinais comparados (vídeo x canal): 651   linhas: 5208
+
+CONJUNTO C0  (C = 0; modelos: exp_simples_c0, potencia_c0, exp_esticada_c0, exp_dupla_c0)
+----------------------------------------------------------------------
+  Canal R  (227 sinais; ruído mediano 0.05 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples_c0        2    100%  0.98866     0.721       15.7          1        0      11.7%          0%
+    potencia_c0           3    100%  0.99722     0.396        8.6         12       12       8.4%          0%
+    exp_esticada_c0       3    100%  0.99876     0.232        5.0         28       25       6.3%          0%
+    exp_dupla_c0          4    100%  0.99926     0.182        3.9        186      182       7.5%          0%
+      beta (esticada; 1 = simples): mediana 0.76 (q10 0.64, q90 0.86)
+      alpha (potência): mediana 3.28 (q10 1.86, q90 6.50); 2% no limite superior (alpha = 20)
+  Canal G  (212 sinais; ruído mediano 0.05 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples_c0        2    100%  0.93966     4.549       87.5          0        0       7.8%          0%
+    potencia_c0           3    100%  0.99899     0.544       10.5         94       92       2.5%          0%
+    exp_esticada_c0       3    100%  0.99777     0.867       16.7         11       11       2.7%          0%
+    exp_dupla_c0          4    100%  0.99910     0.551       10.6        107       99       3.1%          0%
+      beta (esticada; 1 = simples): mediana 0.55 (q10 0.52, q90 0.62)
+      alpha (potência): mediana 1.18 (q10 1.00, q90 1.60)
+  Canal B  (212 sinais; ruído mediano 0.12 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples_c0        2    100%  0.93385     5.266       45.8          0        0       9.0%          0%
+    potencia_c0           3    100%  0.99938     0.464        4.0        177      174       3.1%          0%
+    exp_esticada_c0       3    100%  0.99637     1.142        9.9          3        3       2.8%          0%
+    exp_dupla_c0          4    100%  0.99910     0.659        5.7         32       27       3.8%          0%
+      beta (esticada; 1 = simples): mediana 0.54 (q10 0.51, q90 0.68)
+      alpha (potência): mediana 1.08 (q10 0.90, q90 2.16)
+
+CONJUNTO CL  (C livre; modelos: exp_simples, potencia, exp_esticada, exp_dupla)
+----------------------------------------------------------------------
+  Canal R  (227 sinais; ruído mediano 0.05 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples           3    100%  0.99235     0.599       13.0          0        0       8.8%          0%
+    potencia              4    100%  0.99870     0.251        5.5         14       12       8.0%          0%
+    exp_esticada          4    100%  0.99915     0.199        4.3         12        8       6.3%          0%
+    exp_dupla             5    100%  0.99956     0.152        3.3        201      195       8.5%          0%
+      beta (esticada; 1 = simples): mediana 0.73 (q10 0.64, q90 0.81)
+      alpha (potência): mediana 1.74 (q10 1.32, q90 3.10)
+  Canal G  (212 sinais; ruído mediano 0.05 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples           3    100%  0.98584     2.236       43.0          0        0       1.8%          0%
+    potencia              4    100%  0.99935     0.444        8.5         12       12       2.6%          0%
+    exp_esticada          4    100%  0.99917     0.537       10.3          3        3       2.3%          0%
+    exp_dupla             5    100%  0.99982     0.243        4.7        197      197       2.3%          0%
+      beta (esticada; 1 = simples): mediana 0.63 (q10 0.62, q90 0.68)
+      alpha (potência): mediana 1.06 (q10 0.92, q90 1.38)
+  Canal B  (212 sinais; ruído mediano 0.12 níveis)
+    modelo           parâm.  válido  R² med. rmse med. rmse/ruído  vence BIC  (clara)  CV t_meio t_meio fora
+    exp_simples           3    100%  0.98856     2.445       21.3          0        0       1.9%          0%
+    potencia              4    100%  0.99956     0.413        3.6         20       19       3.2%          0%
+    exp_esticada          4    100%  0.99918     0.625        5.4          2        2       2.1%          0%
+    exp_dupla             5    100%  0.99983     0.273        2.4        190      189       2.5%          0%
+      beta (esticada; 1 = simples): mediana 0.67 (q10 0.63, q90 0.75)
+      alpha (potência): mediana 1.00 (q10 0.86, q90 2.31)
+
+Como ler:
+  - rmse/ruído perto de 1 = o modelo explica a série até o ruído; bem acima = sobra estrutura no resíduo.
+  - 'vence BIC' penaliza parâmetros; '(clara)' = vantagem maior que delta_bic sobre o segundo colocado.
+  - CV t_meio = repetibilidade entre as 5 regravações (mediana por proporção e amostra); comparável entre modelos porque
+    t_meio não depende da forma do modelo. 't_meio fora' = fração em que o tempo de meia-queda foi extrapolado além da janela.
+  - Resultado de comparação: não muda o modelo do caminho principal sem decisão sua.

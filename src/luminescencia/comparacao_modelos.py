@@ -51,7 +51,8 @@ def t_meio(modelo: str, params: dict, duracao_s: float, com_c: bool) -> float:
 
 
 def _tarefa(args) -> list[dict]:
-    ident, t, y, inicio, k, janela, dur_min = args
+    ident, t, y, inicio, k, janela, dur_min = args[:7]
+    c_min = args[7] if len(args) > 7 else None                 # P2: mesmo limite do C livre do modelar.py (só no conjunto cl)
     t, y = np.asarray(t, float), np.asarray(y, float)
     sel = t >= inicio - 1e-9
     t, y = t[sel], y[sel]
@@ -66,7 +67,8 @@ def _tarefa(args) -> list[dict]:
     linhas = []
     for conjunto, nomes in CONJUNTOS.items():
         for nome in nomes:
-            a = ajustar_modelo(MODELOS[nome], tt, yy, PADRAO)
+            cfg_aj = {**PADRAO, "c_minimo": c_min} if (conjunto == "cl" and c_min is not None) else PADRAO
+            a = ajustar_modelo(MODELOS[nome], tt, yy, cfg_aj)
             L = {**ident, "conjunto": conjunto, "modelo": nome, "ruido": round(ruido, 3), "n_pontos": len(tt),
                  "fim_s": round(fim, 3), "ok": bool(a.ok), "motivo": a.motivo}
             if a.params:
@@ -91,7 +93,7 @@ def montar_tarefas(series, vpos, cfg, p, pp) -> list[tuple]:
             ident = {"video": v["video"], "amostra": v["amostra"], "grupo": v["grupo"], "num_video": v["num_video"],
                      "proporcao": v["proporcao"], "canal": c, "canal_ativo": bool(v[f"canal_ativo_{c}"])}
             tarefas.append((ident, g["tempo_s"].to_numpy(), g[f"corr_{c}"].to_numpy(), pp["inicio_ajuste_s"],
-                            p["ruido_k"], p["janela_mediana_pontos"], p["duracao_minima_s"]))
+                            p["ruido_k"], p["janela_mediana_pontos"], p["duracao_minima_s"], p.get("c_livre_c_minimo")))
     return tarefas
 
 

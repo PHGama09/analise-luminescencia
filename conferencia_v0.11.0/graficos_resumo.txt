@@ -1,0 +1,53 @@
+GRÁFICOS
+============================================================
+
+Vídeos típicos usados no gráfico 1 (tau mais perto da mediana da proporção):
+  B1.5: B_15_v5c
+  G1.5: G_15_v4a
+  R1.5: R_15_v3c
+  G1_B0.5: GB_1_05_v5b
+  R1_B0.5: RB_1_05_v3a
+  R0.5_G0.5_B0.5: RGB_05_05_05_v4a
+
+tau_medio: c0 (C = 0) contra cl (C livre)   [mediana; razão cl/c0 mediana por canal]
+  R: n=227  razão cl/c0 mediana 0.99  (q10 0.90, q90 1.13)
+     mediana por amostra (com o pó), c0 / cl: A: 8.2/8.0   B: 7.5/7.4   C: 6.7/6.6
+  G: n=212  razão cl/c0 mediana 0.74  (q10 0.68, q90 0.82)
+     mediana por amostra (com o pó), c0 / cl: A: 13.9/10.2   B: 13.7/10.2   C: 13.8/10.4
+  B: n=212  razão cl/c0 mediana 0.68  (q10 0.61, q90 0.86)
+     mediana por amostra (com o pó), c0 / cl: A: 18.9/11.8   B: 19.0/11.9   C: 17.4/11.6
+
+Resíduo (dado - ajuste): mediana por faixa de tempo, em níveis. Ruído do canal = desvio dos últimos 10 s.
+  R c0 (C = 0): |mediana do resíduo| máx. 0.35  (6x o ruído); média dos |resíduos| 0.19
+  R cl (C livre): |mediana do resíduo| máx. 0.03  (0x o ruído); média dos |resíduos| 0.13
+  G c0 (C = 0): |mediana do resíduo| máx. 0.97  (19x o ruído); média dos |resíduos| 0.44
+  G cl (C livre): |mediana do resíduo| máx. 0.32  (6x o ruído); média dos |resíduos| 0.19
+  B c0 (C = 0): |mediana do resíduo| máx. 1.14  (10x o ruído); média dos |resíduos| 0.51
+  B cl (C livre): |mediana do resíduo| máx. 0.26  (2x o ruído); média dos |resíduos| 0.21
+
+I/I0 (I0 = média dos 3 primeiros pontos da janela): tempo para cair a 50% e a 10%, mediana por canal (só canais com o pó)
+  R: t(I/I0 = 0,5) mediana 4.5 s (min 3.5, máx 4.5); t(0,1) mediana 19.5 s
+  G: t(I/I0 = 0,5) mediana 5.5 s (min 4.5, máx 6.5); t(0,1) mediana 39.5 s
+  B: t(I/I0 = 0,5) mediana 7.5 s (min 5.5, máx 9.5); t(0,1) mediana 49.0 s
+
+Transformações lineares (P4): inclinação 'cedo' e 'tarde' de cada transformação e razão tarde/cedo (1 = reta), mediana entre os sinais com o pó no canal [q10, q90]; só pontos com I > 3 x ruído.
+  loglog   R c0: razão tarde/cedo 1.50 [1.22, 1.93]  (n=160)
+  loglog   G c0: razão tarde/cedo 1.61 [1.42, 1.97]  (n=153)
+  loglog   B c0: razão tarde/cedo 1.53 [1.43, 1.83]  (n=155)
+  loglog   R cl: razão tarde/cedo 1.48 [1.27, 1.90]  (n=160)
+  loglog   G cl: razão tarde/cedo 2.06 [1.83, 2.54]  (n=153)
+  loglog   B cl: razão tarde/cedo 2.05 [1.91, 2.35]  (n=155)
+  ln_t     R c0: razão tarde/cedo 0.69 [0.56, 0.88]  (n=160)
+  ln_t     G c0: razão tarde/cedo 0.38 [0.34, 0.47]  (n=153)
+  ln_t     B c0: razão tarde/cedo 0.36 [0.34, 0.43]  (n=155)
+  ln_t     R cl: razão tarde/cedo 0.69 [0.58, 0.87]  (n=160)
+  ln_t     G cl: razão tarde/cedo 0.49 [0.44, 0.60]  (n=153)
+  ln_t     B cl: razão tarde/cedo 0.49 [0.45, 0.56]  (n=155)
+  inverso  R c0: razão tarde/cedo 1.59 [1.06, 2.73]  (n=160)
+  inverso  G c0: razão tarde/cedo 1.24 [1.02, 1.95]  (n=153)
+  inverso  B c0: razão tarde/cedo 1.02 [0.87, 1.55]  (n=155)
+  inverso  R cl: razão tarde/cedo 1.53 [1.16, 2.68]  (n=160)
+  inverso  G cl: razão tarde/cedo 2.02 [1.71, 3.16]  (n=153)
+  inverso  B cl: razão tarde/cedo 1.81 [1.54, 2.53]  (n=155)
+  janelas (s desde o início do ajuste): R cedo [2, 6], tarde [8, 14]; G cedo [2, 7], tarde [20, 30]; B cedo [2, 7], tarde [20, 30]
+  Razão = inclinação tarde / inclinação cedo (ln I x t: taxa de queda). Perto de 1 = a curva é reta nessa transformação; fora de 1, não é. Não diz qual modelo é o certo (para isso, a comparação de modelos); dá o tipo de desvio.

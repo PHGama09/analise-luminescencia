@@ -4,6 +4,9 @@
   2_tau_cl_vs_c0.png         tau_medio de cl contra c0, por canal e por amostra (o resultado para o orientador)
   3_residuos.png             resíduo médio (dado menos ajuste) ao longo do tempo, para cl e c0, por canal
   4_normalizada.png          I/I0 por proporção, por canal
+  5_log_log.png              P4 (v0.11.0): ln I contra ln t (reta = lei de potência), com C = 0 e com o C do ajuste cl
+  6_ln_I_vs_t.png            P4: ln I contra t (reta = exponencial simples), com C = 0 e com o C do ajuste cl
+  7_inverso_1_sobre_I.png    P4: 1/I contra t (reta = decaimento de 2ª ordem), com C = 0 e com o C do ajuste cl
 
 Lê output/modelagem/ajustes.csv, output/posprocessamento/series_pos.csv e videos_pos.csv. Não altera nada, só desenha.
 Também grava graficos_resumo.txt com os números por trás dos desenhos (para não depender só do olho).
@@ -42,8 +45,12 @@ def _plt():
 
 
 def parametros(cfg: dict) -> dict:
-    p = {"proporcoes_tipicas": TIPICAS, "dpi": 130, "bin_residuo_s": 2.0, "bin_normalizada_s": 1.0}
+    p = {"proporcoes_tipicas": TIPICAS, "dpi": 130, "bin_residuo_s": 2.0, "bin_normalizada_s": 1.0,
+         # P4: janelas (s desde o início do ajuste) onde se mede a inclinação "cedo" e "tarde" de cada transformação
+         "janelas_inclinacao": {"R": [[2, 6], [8, 14]], "G": [[2, 7], [20, 30]], "B": [[2, 7], [20, 30]]},
+         "k_ruido_inclinacao": 3.0}          # só pontos com I > k x ruído entram nas inclinações
     p.update(cfg.get("graficos", {}) or {})
+    p["instante_queda_s"] = float(cfg.get("protocolo", {}).get("instante_queda_s", 0.5))   # zero do log-log
     return p
 
 
@@ -76,6 +83,20 @@ def _tipico(aj: pd.DataFrame, proporcao: str) -> str | None:
     if por_video.empty:
         return None
     return (por_video - por_video.median()).abs().idxmin()
+
+
+def _ticks_log(ax, lim) -> None:
+    """Rótulos legíveis em eixo log (sem os rótulos menores sobrepostos): só valores 'redondos' dentro do intervalo."""
+    from matplotlib.ticker import FixedLocator, FixedFormatter, NullFormatter, NullLocator
+
+    cand = [v for v in (0.3, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40, 60, 100) if lim[0] <= v <= lim[1]]
+    if len(cand) < 2:
+        return
+    for eixo in (ax.xaxis, ax.yaxis):
+        eixo.set_major_locator(FixedLocator(cand))
+        eixo.set_major_formatter(FixedFormatter([f"{v:g}" for v in cand]))
+        eixo.set_minor_locator(NullLocator())
+        eixo.set_minor_formatter(NullFormatter())
 
 
 # ---------------------------------------------------------------- 1. semilog
@@ -157,6 +178,7 @@ def grafico_tau(aj, vpos, p, out) -> list[str]:
                 ax.scatter(x["tau_c0"], x["tau_cl"], s=16, marker=mk, facecolors=fc, edgecolors=cor, linewidths=1,
                            label=f"{a_}{'' if po else ' (sem o pó)'}", alpha=0.8)
         ax.set_xscale("log"); ax.set_yscale("log")
+        _ticks_log(ax, lim)
         ax.set_xlabel("tau_medio c0 (s)"); ax.set_ylabel("tau_medio cl (s)")
         razao = (d["tau_cl"] / d["tau_c0"]).median()
         ax.set_title(f"canal {c}: cl/c0 mediana {razao:.2f}", color=COR_CANAL[c], fontsize=10)
@@ -319,6 +341,147 @@ def grafico_normalizada(series, vpos, aj, p, out) -> list[str]:
     return L
 
 
+# ---------------------------------------------------------------- 5 a 7. transformações lineares (P4)
+VERSOES = (("c0", "C = 0: I = corr"), ("cl", "C livre: I = corr - C do ajuste cl"))
+
+
+def sinais_normalizados(series: pd.DataFrame, vpos: pd.DataFrame, aj: pd.DataFrame, t_corte: float) -> pd.DataFrame:
+    """I/I0 por vídeo, canal e versão ('c0': I = corr; 'cl': I = corr - C do ajuste c_livre), na janela do ajuste principal.
+
+    I0 = média dos 3 primeiros pontos da janela (de cada versão). t_rel = s desde o início da janela; tc = s desde o corte
+    do protocolo (zero do log-log; o resultado do log-log depende dessa escolha de zero). ruido_norm = ruído do canal / I0.
+    Só vídeo x canal com os dois ajustes (principal e c_livre) válidos; com_po vem do nome (só legenda e conferência).
+    """
+    a = _ajustes_validos(aj)
+    pr = a[a["caminho"] == "principal"].set_index(["video", "canal"])
+    cl = a[a["caminho"] == "c_livre"].set_index(["video", "canal"])
+    chaves = pr.index.intersection(cl.index)
+    m = vpos.set_index("video")
+    por_video = {v: g for v, g in series.groupby("video")}
+    partes = []
+    for (v, c) in chaves:
+        g = por_video.get(v)
+        if g is None:
+            continue
+        l = pr.loc[(v, c)]
+        d = g[(g["tempo_s"] >= l["inicio_s"] - 1e-9) & (g["tempo_s"] <= l["fim_s"] + 1e-9)]
+        if len(d) < 8:
+            continue
+        t = d["tempo_s"].to_numpy()
+        bruto = d[f"corr_{c}"].to_numpy()
+        for versao, y in (("c0", bruto), ("cl", bruto - float(cl.loc[(v, c), "C"]))):
+            i0 = float(np.mean(y[:3]))
+            if not i0 > 0:
+                continue
+            partes.append(pd.DataFrame({"video": v, "canal": c, "versao": versao, "t_rel": t - t[0], "tc": t - t_corte,
+                                        "i_norm": y / i0, "ruido_norm": float(l["ruido"]) / i0}))
+    n = pd.concat(partes, ignore_index=True) if partes else pd.DataFrame()
+    if len(n):
+        n["proporcao"] = n["video"].map(m["proporcao"])
+        n["com_po"] = [bool(m.loc[v, f"canal_ativo_{c}"]) for v, c in zip(n["video"], n["canal"])]
+    return n
+
+
+def _inclinacao(x: np.ndarray, y: np.ndarray, minimo: int = 5) -> float:
+    return float(np.polyfit(x, y, 1)[0]) if len(x) >= minimo and np.ptp(x) > 0 else float("nan")
+
+
+def inclinacoes(n: pd.DataFrame, p: dict) -> pd.DataFrame:
+    """Por sinal e versão: inclinação 'cedo' e 'tarde' de cada transformação e a razão tarde/cedo.
+
+    Uma transformação em que a curva é uma reta dá razão 1:
+      ln I x t         (exponencial simples)   taxa = -inclinação
+      ln I x ln t      (lei de potência)       inclinação
+      1/I x t          (2ª ordem)              inclinação
+    Só entram pontos com I > k x ruído; cada janela precisa de 5 pontos.
+    """
+    linhas = []
+    for (v, c, ver), g in n.groupby(["video", "canal", "versao"]):
+        (a0, a1), (b0, b1) = p["janelas_inclinacao"][c]
+        ok = g["i_norm"] > p["k_ruido_inclinacao"] * g["ruido_norm"]
+        g = g[ok & (g["tc"] > 0)]
+        L = {"video": v, "canal": c, "versao": ver, "proporcao": g["proporcao"].iloc[0] if len(g) else None,
+             "com_po": bool(g["com_po"].iloc[0]) if len(g) else None}
+        for nome, fx, fy in (("ln_t", lambda d: d["t_rel"], lambda d: np.log(d["i_norm"])),
+                             ("loglog", lambda d: np.log(d["tc"]), lambda d: np.log(d["i_norm"])),
+                             ("inverso", lambda d: d["t_rel"], lambda d: 1 / d["i_norm"])):
+            res = []
+            for lo, hi in ((a0, a1), (b0, b1)):
+                d = g[(g["t_rel"] >= lo) & (g["t_rel"] <= hi)]
+                res.append(_inclinacao(fx(d).to_numpy(), fy(d).to_numpy()))
+            L[f"{nome}_cedo"], L[f"{nome}_tarde"] = res
+            L[f"{nome}_razao"] = res[1] / res[0] if res[0] == res[0] and res[0] != 0 else float("nan")
+        linhas.append(L)
+    return pd.DataFrame(linhas)
+
+
+TRANSFORMACOES = (
+    ("5_log_log.png", "loglog", "ln I contra ln t: reta = lei de potência (zero do tempo = corte do protocolo)", "tc", "log", "log"),
+    ("6_ln_I_vs_t.png", "ln_t", "ln I contra t: reta = exponencial simples", "t_rel", "linear", "log"),
+    ("7_inverso_1_sobre_I.png", "inverso", "1/I contra t: reta = decaimento de segunda ordem", "t_rel", "linear", "inverso"),
+)
+
+
+def grafico_transformacoes(series, vpos, aj, p, out) -> list[str]:
+    """Gráficos 5, 6 e 7: mediana de I/I0 por proporção (só canais com o pó), com C = 0 (linha de cima) e C livre (de baixo)."""
+    plt = _plt()
+    n = sinais_normalizados(series, vpos, aj, p["instante_queda_s"])
+    if n.empty:
+        return []
+    passo = p["bin_normalizada_s"]
+    n["bin"] = (n["t_rel"] // passo) * passo + passo / 2
+    n["tc_bin"] = n["bin"] + float((n["tc"] - n["t_rel"]).median())          # tc = t_rel + (início da janela - corte)
+    props = sorted(n["proporcao"].unique())
+    cmap = plt.get_cmap("tab20")
+    cores = {pr: cmap(i % 20) for i, pr in enumerate(props)}
+    inc = inclinacoes(n, p)
+    L = ["Transformações lineares (P4): inclinação 'cedo' e 'tarde' de cada transformação e razão tarde/cedo (1 = reta), "
+         "mediana entre os sinais com o pó no canal [q10, q90]; só pontos com I > 3 x ruído."]
+    for arq, nome, titulo, colx, escx, escy in TRANSFORMACOES:
+        fig, eixos = plt.subplots(2, 3, figsize=(16, 9), squeeze=False)
+        for i, (ver, rot_ver) in enumerate(VERSOES):
+            for j, c in enumerate(CANAIS):
+                ax = eixos[i][j]
+                d = n[(n["canal"] == c) & n["com_po"] & (n["versao"] == ver)]
+                if d.empty:
+                    ax.text(0.5, 0.5, f"canal {c}: sem ajustes", ha="center", va="center", transform=ax.transAxes, color="gray")
+                    continue
+                for pr in props:
+                    x = d[d["proporcao"] == pr]
+                    if x.empty:
+                        continue
+                    cm = x.groupby(["bin"]).agg(y=("i_norm", "median"), xx=(colx if colx == "t_rel" else "tc_bin", "median"))
+                    cm = cm[cm["y"] > 0]
+                    y = 1 / cm["y"] if escy == "inverso" else cm["y"]
+                    ax.plot(cm["xx"] if colx != "t_rel" else cm.index, y, color=cores[pr], lw=1.1, label=pr)
+                if escx == "log":
+                    ax.set_xscale("log")
+                    _ticks_log(ax, ax.get_xlim())
+                if escy == "log":
+                    ax.set_yscale("log"); ax.set_ylim(0.01, 1.3)
+                elif escy == "inverso":
+                    ax.set_ylim(0, min(60, ax.get_ylim()[1]))
+                ax.grid(alpha=0.25, which="both")
+                ax.set_title(f"canal {c} · {rot_ver}", fontsize=9, loc="left", color=COR_CANAL[c])
+                ax.set_xlabel("tempo desde o corte do protocolo (s)" if colx == "tc" else "tempo desde o início da janela (s)")
+                ax.set_ylabel({"loglog": "I / I0", "ln_t": "I / I0", "inverso": "I0 / I"}[nome])
+                if i == 0 and j == 0:
+                    ax.legend(fontsize=5.5, ncol=2, loc="lower left")
+                s_ = inc[(inc["canal"] == c) & (inc["versao"] == ver) & (inc["com_po"] == True)][f"{nome}_razao"].dropna()  # noqa: E712
+                if len(s_):
+                    ax.text(0.97, 0.97, f"tarde/cedo: {s_.median():.2f}", transform=ax.transAxes, ha="right", va="top", fontsize=8,
+                            bbox=dict(boxstyle="round", fc="white", ec="0.7", alpha=0.85))
+                    L.append(f"  {nome:<8} {c} {ver}: razão tarde/cedo {s_.median():.2f} [{s_.quantile(.1):.2f}, {s_.quantile(.9):.2f}]  (n={len(s_)})")
+        fig.suptitle(titulo, fontsize=12)
+        fig.tight_layout()
+        fig.savefig(out / arq, dpi=p["dpi"], bbox_inches="tight")
+        plt.close(fig)
+    L.append("  janelas (s desde o início do ajuste): " + "; ".join(f"{c} cedo {p['janelas_inclinacao'][c][0]}, tarde {p['janelas_inclinacao'][c][1]}" for c in CANAIS))
+    L.append("  Razão = inclinação tarde / inclinação cedo (ln I x t: taxa de queda). Perto de 1 = a curva é reta nessa transformação; "
+             "fora de 1, não é. Não diz qual modelo é o certo (para isso, a comparação de modelos); dá o tipo de desvio.")
+    return L
+
+
 def rodar(cfg: dict, pasta_modelagem=None, pasta_pos=None, saida=None) -> int:
     p = parametros(cfg)
     raiz = Path(cfg.get("pastas", {}).get("saida", "output"))
@@ -335,7 +498,8 @@ def rodar(cfg: dict, pasta_modelagem=None, pasta_pos=None, saida=None) -> int:
     texto = ["GRÁFICOS", "=" * 60, ""]
     for nome, fn in (("1 semilog", lambda: grafico_semilog(aj, series, p, out)), ("2 tau", lambda: grafico_tau(aj, vpos, p, out)),
                      ("3 resíduos", lambda: grafico_residuos(aj, series, p, out)),
-                     ("4 normalizada", lambda: grafico_normalizada(series, vpos, aj, p, out))):
+                     ("4 normalizada", lambda: grafico_normalizada(series, vpos, aj, p, out)),
+                     ("5 a 7 transformações lineares", lambda: grafico_transformacoes(series, vpos, aj, p, out))):
         print(f"gráfico {nome}...")
         texto += fn() + [""]
     (out / "graficos_resumo.txt").write_text("\n".join(texto), encoding="utf-8")

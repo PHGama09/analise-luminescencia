@@ -85,6 +85,12 @@ def _cmd_comparar_modelos(args, cfg):
     return rodar(cfg, pasta_pos=args.pos, saida=args.saida)
 
 
+def _cmd_descritores(args, cfg):
+    from .descritores import rodar
+
+    return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, saida=args.saida)
+
+
 def _cmd_graficos(args, cfg):
     from .graficos import rodar
 
@@ -169,7 +175,13 @@ def main(argv=None) -> int:
     p.add_argument("--saida", help="pasta de saída (padrão: output/modelagem)")
     p.set_defaults(func=_cmd_comparar_modelos)
 
-    p = sub.add_parser("graficos", parents=[comum], help="7. Gráficos: semilog com os dois ajustes, tau cl x c0, resíduos, normalizada")
+    p = sub.add_parser("descritores", parents=[comum], help="6d. Descritores sem modelo (t50, t10, razões em tempos fixos, área); tabela paralela ao dataset")
+    p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
+    p.add_argument("--modelagem", help="pasta da modelagem, só para comparar a repetibilidade com o tau (padrão: output/modelagem)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/tabela)")
+    p.set_defaults(func=_cmd_descritores)
+
+    p = sub.add_parser("graficos", parents=[comum], help="7. Gráficos: semilog com os dois ajustes, tau cl x c0, resíduos, normalizada, log-log, ln I x t, 1/I x t")
     p.add_argument("--modelagem", help="pasta da modelagem (padrão: output/modelagem)")
     p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/graficos)")

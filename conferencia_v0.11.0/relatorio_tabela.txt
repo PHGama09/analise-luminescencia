@@ -1,0 +1,18 @@
+TABELA FINAL
+============================================================
+Vídeos: 236   colunas: 106
+
+Vídeos por amostra e grupo:
+  A (treino): 79
+  B (treino): 78
+  C (validacao): 79
+
+Ajustes presentes (vídeos com ajuste / total de vídeos), por caminho e canal; entre parênteses: com o pó / sem o pó (só vazamento de cor):
+  R_cl: 227/236 (160/161 / 67/75)   G_cl: 212/236 (153/161 / 59/75)   B_cl: 212/236 (155/163 / 57/73)
+  R_c0: 227/236 (160/161 / 67/75)   G_c0: 212/236 (153/161 / 59/75)   B_c0: 212/236 (155/163 / 57/73)
+
+Vídeos sem ajuste principal por saturação depois de 2.5 s: 9
+  GB_05_1_v1a, GB_05_1_v2a, GB_05_1_v3a, GB_05_1_v4a, GB_05_1_v5a, B_15_v1b, RG_05_1_v3b, GB_075_075_v4b, GB_075_075_v5b
+
+Entradas da IA: não usar colunas meta nem canal_ativo_* (vazam o alvo). *_ok e sinal_presente_* são medidos no vídeo.
+Canal sem o pó com sinal é ajustado; o tau dele descreve o vazamento de cor, não o pó daquele canal.

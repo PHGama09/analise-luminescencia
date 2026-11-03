@@ -32,3 +32,11 @@ def test_dicionario_marca_papeis_e_o_vazamento():
     assert dic.loc["video", "papel"] == "meta" and dic.loc["prop_G", "papel"] == "alvo" and dic.loc["G_cl_tau1", "papel"] == "feature"
     assert dic.loc["canal_ativo_G", "papel"] == "flag" and "vaza" in dic.loc["canal_ativo_G", "descricao"]
     assert "pode ser entrada" in dic.loc["sinal_presente_G", "descricao"] and "pode ser entrada" in dic.loc["G_cl_ok", "descricao"]
+
+
+def test_excluido_saturacao_le_o_inicio_da_janela():
+    # v2 satura até 3,0 s: com início 2,5 s ou 3,0 s é excluído; com início 3,5 s não é mais (a janela já começa depois)
+    for inicio, esperado in ((2.5, True), (3.0, True), (3.5, False)):
+        d = montar(*_entradas(), inicio_ajuste_s=inicio).set_index("video")
+        assert bool(d.loc["v2", "excluido_saturacao"]) is esperado, inicio
+    assert not bool(montar(*_entradas()).set_index("video").loc["v1", "excluido_saturacao"])

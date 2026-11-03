@@ -1,0 +1,20 @@
+Esta pasta NÃO vai para o repositório. São os resultados do assistente (executor de 1 CPU, Python 3.12, numpy 2.4, pandas 3.0, scipy 1.17)
+com os seus CSVs reais, para você conferir na sua máquina depois de copiar o zip e rodar, nesta ordem:
+  pytest                       (esperado: 74 passed)
+  luminescencia modelar
+  luminescencia tabela
+  luminescencia comparar_modelos
+  luminescencia descritores
+  luminescencia graficos
+(o 'pos' não mudou). Diferença de fim de linha não conta; diferença numérica < ~0,001 em tau e nas colunas da tabela é aceitável.
+
+Números-chave (v0.11.0, modelagem.c_livre_c_minimo = -1.35):
+  ajustes 3933; c_livre dupla 650 / simples 1; colados no limite: R 6 de 227 (3%), G 0, B 0
+  CV do tau c_livre: R 11,8 / G 3,7 / B 4,5 %;  sensibilidade c_livre no R 6,2 % (viés -0,6 %)
+  placar cl (BIC): R dupla 201 / potência 14 / esticada 12;  G 197 / 12 / 3;  B 190 / 20 / 2
+  dataset.csv 236 x 106 (só 18 colunas R_cl_* e B_cl_* diferem do da v0.10.0);  descritores.csv idêntico ao da v0.10.0
+  dicionario_descritores.csv: 3 avisos (R_md_t10, R_md_r_20s, R_md_r_40s)
+  graficos_resumo.txt: razão tarde/cedo (c0/cl)  ln_t R 0,69/0,69 G 0,38/0,49 B 0,36/0,49;  loglog R 1,50/1,48 G 1,61/2,06 B 1,53/2,05;
+                       inverso R 1,59/1,53 G 1,24/2,02 B 1,02/1,81
+Arquivos alterados: __init__.py, cli.py, graficos.py, tabela.py, descritores.py, README.md, config.yaml, requirements.txt, pyproject.toml
+Arquivos novos: tests/test_graficos_transformacoes.py (e 1 teste novo em test_tabela.py e 1 em test_descritores.py)

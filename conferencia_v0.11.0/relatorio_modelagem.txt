@@ -1,0 +1,73 @@
+MODELAGEM (C = 0)
+============================================================
+Ajustes: 3933   com modelo: 3933
+
+Caminhos e modelo escolhido (contagem):
+  a_parte: {'exp_dupla_c0': 26, 'exp_simples_c0': 1}
+  c_livre: {'exp_dupla': 650, 'exp_simples': 1}
+  gama: {'exp_dupla_c0': 650, 'exp_simples_c0': 1}
+  inicio_2s: {'exp_dupla_c0': 650, 'exp_simples_c0': 1}
+  inicio_3s: {'exp_dupla_c0': 643, 'exp_simples_c0': 8}
+  piso_fixo: {'exp_dupla_c0': 637, 'exp_simples_c0': 14}
+  principal: {'exp_dupla_c0': 649, 'exp_simples_c0': 2}
+
+Sem ajuste (motivos):
+  nenhum
+
+Repetibilidade do tau_medio entre as 5 regravações (CV mediano = desvio/média, por proporção e amostra; menor = mais estável):
+  principal: R 11.3%   G 7.5%   B 9.1%
+  c_livre: R 11.8%   G 3.7%   B 4.5%
+  gama: R 14.3%   G 8.2%   B 9.4%
+
+tau_medio mediano por amostra (diferença entre amostras = possível viés de sessão que a IA poderia aprender):
+  principal: R: A=7.3/B=6.2/C=6.2   G: A=14.8/B=14.5/C=13.7   B: A=16.9/B=15.5/C=16.5
+  c_livre: R: A=7.4/B=6.3/C=6.2   G: A=10.8/B=10.7/C=10.5   B: A=11.2/B=10.9/C=11.1
+  gama: R: A=3.1/B=2.7/C=2.6   G: A=4.5/B=4.3/C=4.2   B: A=4.8/B=4.5/C=4.7
+
+Patamar C do ajuste livre (níveis, mediana) contra o erro do ajuste (rmse mediano) com C = 0 e com C livre:
+  R: C = 0.04   rmse C=0: 0.18   rmse C livre: 0.15   ruído do canal: 0.05
+  G: C = 4.68   rmse C=0: 0.55   rmse C livre: 0.24   ruído do canal: 0.05
+  B: C = 6.54   rmse C=0: 0.66   rmse C livre: 0.27   ruído do canal: 0.12
+
+Limite do patamar no C livre: C >= -1.35 níveis (modelagem.c_livre_c_minimo; null desliga). Ajustes com C colado no limite (C <= -1.34):
+  R: 6 de 227 (3%)
+  G: 0 de 212 (0%)
+  B: 0 de 212 (0%)
+
+Sensibilidade: diferença relativa mediana do tau_medio contra o principal (mesmo vídeo e canal):
+  c_livre: {'R': '6.2% (viés -0.6%, n=227)', 'G': '26.0% (viés -26.0%, n=212)', 'B': '32.1% (viés -32.1%, n=212)'}
+  gama: {'R': '59.8% (viés -59.8%, n=227)', 'G': '70.4% (viés -70.4%, n=212)', 'B': '71.3% (viés -71.3%, n=212)'}
+  inicio_2s: {'R': '7.6% (viés -7.6%, n=227)', 'G': '7.8% (viés -7.8%, n=212)', 'B': '7.2% (viés -7.2%, n=212)'}
+  inicio_3s: {'R': '5.8% (viés +5.8%, n=227)', 'G': '6.5% (viés +6.5%, n=212)', 'B': '6.0% (viés +5.9%, n=212)'}
+  piso_fixo: {'R': '9.6% (viés -1.0%, n=227)', 'G': '4.0% (viés -1.0%, n=212)', 'B': '4.5% (viés -1.2%, n=212)'}
+  Regra: se a diferença for MAIOR que o CV entre regravações, o caminho muda o resultado além do ruído.
+  gama: sobre o sinal linearizado (gama 2.2). Se o decaimento em valores de vídeo fosse uma exponencial simples, o tau linear seria tau/2.2 (diferença de 55% para menos): essa parte é só mudança de escala. O que importa é o CV entre regravações e a diferença entre amostras acima, comparados com o principal.
+
+Ajustados à parte (janela própria; não misturar com o principal):
+  GB_05_1_v1a R: início 3.4 s, exp_dupla_c0, tau_medio 7.2
+  GB_05_1_v1a G: início 3.4 s, exp_dupla_c0, tau_medio 19.1
+  GB_05_1_v1a B: início 3.4 s, exp_dupla_c0, tau_medio 22.8
+  GB_05_1_v2a R: início 3.333 s, exp_dupla_c0, tau_medio 5.1
+  GB_05_1_v2a G: início 3.333 s, exp_dupla_c0, tau_medio 18.5
+  GB_05_1_v2a B: início 3.333 s, exp_dupla_c0, tau_medio 22.1
+  GB_05_1_v3a R: início 3.133 s, exp_dupla_c0, tau_medio 6.3
+  GB_05_1_v3a G: início 3.133 s, exp_dupla_c0, tau_medio 11.9
+  GB_05_1_v3a B: início 3.133 s, exp_dupla_c0, tau_medio 14.3
+  GB_05_1_v4a R: início 3.533 s, exp_simples_c0, tau_medio 5.6
+  GB_05_1_v4a G: início 3.533 s, exp_dupla_c0, tau_medio 18.9
+  GB_05_1_v4a B: início 3.533 s, exp_dupla_c0, tau_medio 23.4
+  GB_05_1_v5a R: início 3.0 s, exp_dupla_c0, tau_medio 5.0
+  GB_05_1_v5a G: início 3.0 s, exp_dupla_c0, tau_medio 19.0
+  GB_05_1_v5a B: início 3.0 s, exp_dupla_c0, tau_medio 22.5
+  B_15_v1b R: início 2.8 s, exp_dupla_c0, tau_medio 5.4
+  B_15_v1b G: início 2.8 s, exp_dupla_c0, tau_medio 16.7
+  B_15_v1b B: início 2.8 s, exp_dupla_c0, tau_medio 22.1
+  RG_05_1_v3b R: início 13.933 s, exp_dupla_c0, tau_medio 3.4
+  RG_05_1_v3b G: início 13.933 s, exp_dupla_c0, tau_medio 7.3
+  RG_05_1_v3b B: início 13.933 s, exp_dupla_c0, tau_medio 4.4
+  GB_075_075_v4b R: início 3.0 s, exp_dupla_c0, tau_medio 4.9
+  GB_075_075_v4b G: início 3.0 s, exp_dupla_c0, tau_medio 13.5
+  GB_075_075_v4b B: início 3.0 s, exp_dupla_c0, tau_medio 14.4
+  GB_075_075_v5b R: início 2.733 s, exp_dupla_c0, tau_medio 3.9
+  GB_075_075_v5b G: início 2.733 s, exp_dupla_c0, tau_medio 14.3
+  GB_075_075_v5b B: início 2.733 s, exp_dupla_c0, tau_medio 15.7

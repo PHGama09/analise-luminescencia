@@ -1,6 +1,6 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.9.0).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **gráficos** (7) e a escolha de **entradas da IA** (`entradas.py`). Ainda não existem: treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.11.0).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t) e a escolha de **entradas da IA** (`entradas.py`). Ainda não existem: treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 ## Objetivo
 
@@ -124,12 +124,34 @@ Caminhos: `principal` (C = 0, janela fixa de 2,5 s), `inicio_2s` / `inicio_3s`, 
 - **`C = 0` x `C` livre:** o `C` livre acha um patamar positivo (G ~4,7 e B ~6,5 níveis, estável entre amostras) e erra a série cerca de 2x menos (rmse 0,24 contra 0,55 no G), embora ainda acima do ruído (0,05). O tau muda 26% (G) e 32% (B), muito mais que o ruído. O `C` livre foi **mais** repetível entre regravações que o `C = 0` (CV 3,7% contra 7,5% no G; 4,5% contra 9,1% no B) e tem menos diferença entre amostras (B: 10,9-11,2 s contra 15,5-16,9 s com `C = 0`). No R (patamar ~0) os dois são equivalentes e o `C` livre é um pouco pior (CV 11,8% contra 11,3%). Números da rodada de 02/11/2026 com os 3282 ajustes (versão anterior deste README trazia B ~8,7, de uma rodada antiga).
 
 
+**Limite do patamar no C livre (P2, v0.10.0; valor final decidido na Q1, v0.11.0: -1,35).** `modelagem.c_livre_c_minimo` (padrão **-1.35** desde a v0.11.0, era `0.0` na v0.10.0; `null` volta ao comportamento da v0.9.0) impede o patamar `C` do caminho `c_livre` de ficar abaixo do valor dado. `ajustes.csv` ganha a coluna `C_no_limite` (C a menos de 0,01 nível do limite) e o relatório conta quantos ajustes ficaram colados. Vale também para o conjunto `cl` de `comparar_modelos`, para os dois falarem do mesmo "C livre". Os outros caminhos (principal, inicio_2s/3s, piso_fixo, gama, a_parte) ficaram **idênticos** aos da v0.9.0 (diferença máxima de tau 0,00002 em 3933 ajustes).
+
+*O que foi medido (só o R muda de forma relevante; G não muda, B muda em 1 vídeo):*
+
+| Limite de C (R, 227 ajustes) | colados no limite | ajustes que mudam | tau > 30 s |
+|---|---|---|---|
+| sem limite (v0.9.0) | n/a | n/a | 3 |
+| **C >= 0 (padrão da v0.10.0)** | **106 (47%)** | **100** | 0 |
+| C >= -1 | 13 | 11 | 0 |
+| C >= -2 | 3 | 3 | 0 |
+| **C >= -1,35 (padrão da v0.11.0)** | **6** | **6** | 0 |
+
+- **A premissa da decisão não se confirmou:** o limite C >= 0 **não** fica restrito aos 3 vídeos degenerados (`GB_075_075_v1a`, `GB_1_05_v1a`, `RB_05_1_v3a`). 103 dos 227 ajustes de R tinham C < 0 (33 abaixo de -0,5; o resto entre -0,5 e -1,6, ordem de grandeza do erro do preto por vídeo). Com C >= 0, 100 ajustes de R mudam (mediana de |delta tau| 7,9%, máximo 35,7%).
+- Os 3 degenerados ficam normais (tau 80-120 s -> 6,4-9,8 s; C -23 a -33 -> 0), mas com C = 0 o ajuste deles **é igual ao `c0`** (mesmo tau).
+- **Consequência para a tabela:** em 47% dos sinais de R, `R_cl_*` passa a ser cópia de `R_c0_*` (54% com tau dentro de 2%). Mais redundância entre os dois caminhos (risco 2 abaixo). CV do tau no R: 11,8% -> 11,3%; o rmse mediano do R com C livre sobe de 0,151 para 0,166 (C = 0: 0,180).
+- **Um vídeo troca de modelo:** `B_15_v3b` (R) passa de dupla para simples (tau 7,6 -> 4,9 s). O `RG_1_05_v2a` (B) tem C -0,69 e vira C = 0 (tau muda 9%).
+- **Decisão Q1 (03/11/2026): `c_livre_c_minimo: -1.35`.** Primeiro se pensou em -2, que passa nos critérios fixados antes do teste (os 3 degenerados com tau normal, nenhum outro sinal muda, poucos colados) e deixa o resto do dataset como na v0.9.0. Mas -2 vem de uma folga nos dados, não de uma regra. O valor adotado é **3 x 0,45**, onde 0,45 é o erro do preto medido no R (desvio do nível final entre regravações com o piso por vídeo, `relatorio_consolidacao.txt`); é uma estimativa aproximada, porque esse desvio inclui outras fontes. Teste feito com os dados reais, só no caminho `c_livre`:
+  - Em relação à v0.9.0 (sem limite) mudam **6 de 651 sinais**, todos no R, nenhum troca de modelo: os 3 degenerados (tau 93/80/120 s -> 9,1/7,7/11,4 s) e `RGB_025_1_025_v4a`, `G_15_v4b`, `RGB_025_1_025_v4b` (2 a 3,5%). Os outros 6 caminhos ficam idênticos ao da v0.10.0 (diferença máxima de tau 0,00002).
+  - **Colados no limite: R 6 de 227 (3%), G 0, B 0.** O `R_cl_*` é cópia do `R_c0_*` (tau dentro de 2%) em cerca de 15% dos sinais do R, contra 54% com C >= 0.
+  - **Limite do método:** o tau desses 6 sinais **depende do limite**. Os 3 degenerados querem C de -22 a -33; com limite 0, -1, -1,35 e -2 o tau deles é 7,4 / 8,6 / 9,1 / 10,2 s (exemplo `GB_075_075_v1a`). O limite só evita o absurdo (tau de 80 a 120 s); não faz o ajuste identificar o patamar. Eles ficam marcados por `C_no_limite = True` em `ajustes.csv`.
+  - Números de referência (v0.11.0): CV do tau `c_livre` R 11,8 / G 3,7 / B 4,5%; tau por amostra (A/B/C) no R 7,4/6,3/6,2; rmse do R com C livre 0,15 (ruído 0,05); sensibilidade `c_livre` contra o principal no R 6,2% (viés -0,6%); `c_livre`: dupla 650, simples 1 (`B_15_v4b`, R). Se a sessão de gravação mudar, refazer o teste.
+
 ### 6b. Tabela final (`luminescencia tabela`, v0.8.1)
 Grava em `output/tabela/` `dataset.csv` (uma linha por vídeo aceito, formato largo), `dicionario.csv` (papel de cada coluna: meta, alvo, feature, flag) e `relatorio_tabela.txt`.
 
 - **Decididos em 02/11/2026:** os dois caminhos (`cl` = C livre, `c0` = C = 0) vêm lado a lado para treinar só com um ou com ambos e para comparar com o orientador; o mesmo caminho vale nos três canais (R, G, B), para padronizar e reaproveitar em projetos futuros. Antes de entregar à IA, rodar o treino com três conjuntos (só `cl`, só `c0`, ambos) e comparar na amostra C.
 - **Não usar como entrada da IA:** colunas `meta` (nome do vídeo, amostra, grupo) e `canal_ativo_*` (vem de `prop_*`, ou seja, do alvo).
-- **Vídeos que saturam depois de 2,5 s** (9) ficam sem ajuste principal; o ajuste à parte fica só em `ajustes.csv`.
+- **Vídeos que saturam depois do início da janela** (2,5 s; 9 vídeos; desde a v0.11.0 o `tabela.py` lê `posprocessamento.inicio_ajuste_s` em vez de ter o 2,5 fixo) ficam sem ajuste principal; o ajuste à parte fica só em `ajustes.csv`.
 - **Vazamento do alvo (resolvido em 02/11/2026, v0.8.1):** o ajuste é decidido pelo sinal medido. Canal sem o pó mas com sinal (vazamento de cor da câmera) também é ajustado: 67/75 no R, 59/75 no G e 57/73 no B. O tau dele descreve o vazamento de cor, não o pó daquele canal, mas é repetível entre regravações (CV mediano 3 a 10%, R² > 0,999). Entradas da IA: não usar `meta` nem `canal_ativo_*`; `*_ok` e `sinal_presente_*` são medidos no vídeo e podem ser usados.
 
 ### 6c. Comparação de modelos (`luminescencia comparar_modelos`, v0.9.0, decisão D3)
@@ -137,11 +159,29 @@ Compara **só para análise** a exponencial simples, a dupla, a **exponencial es
 
 Como comparar formas diferentes: BIC (penaliza parâmetros) e o erro em relação ao ruído do canal; a repetibilidade é medida em `t_meio` (tempo em que a curva ajustada cai à metade), que não depende da forma do modelo, porque o tau de uma esticada ou o t0 de uma potência não são o `tau_medio` da dupla.
 
+**ATENÇÃO (v0.10.0, P2):** o conjunto `cl` agora usa o mesmo limite do `c_livre` (`modelagem.c_livre_c_minimo`, padrão 0). Os números de `cl` abaixo são **os da v0.9.0 (sem limite)**; com C >= 0 o quadro muda (ver o fim desta seção). Os de `c0` não mudam.
+
 **Resultado nos 236 vídeos (651 sinais; 02/11/2026) e o que ele contraria:**
 - A exponencial **dupla vence a simples e a esticada** em todos os canais, mas **não é o melhor descritor em G e B**. No conjunto `c0`, a **lei de potência com 3 parâmetros vence a dupla de 4 parâmetros em B** (177 contra 32 vitórias no BIC; R² mediano 0,99938 contra 0,99910) e fica empatada em G (94 contra 107). Com C livre, a potência com C (4 parâmetros) vence em G (139 contra 70) e em B (118 contra 92) e a dupla (5) vence em R (176 contra 40). O expoente da potência fica perto de 1 em B/G (mediana 1,1-1,2 com C = 0; 0,7-0,8 com C livre).
 - O **R** não pede cauda lenta: a dupla vence (186 de 227 com C = 0).
 - A repetibilidade de `t_meio` é parecida entre dupla, potência e esticada em G e B (CV 2 a 4%). Com C = 0 a simples é a menos repetível (8 a 12%); com C livre a potência é a menos repetível (4 a 13%).
 - **Cuidado com a leitura:** com expoente próximo de 1 a lei de potência não tem escala de tempo própria (o tempo para cair à metade depende de onde a janela começa). Isso é coerente com o que já se viu (tau muda ~7% ao mover o início da janela) e é um indício de que o decaimento tem cauda tipo potência, mas **com 60 s de vídeo e só R² não prova** o mecanismo. Nenhum modelo extra foi adotado; isso é decisão sua (ver "Pontos em aberto").
+
+**O que a v0.10.0 mudou nesse resultado (C >= 0 no conjunto `cl`):** a vantagem da lei de potência **com C** em G e B **vinha de um patamar C negativo**. Na v0.9.0, as 139 vitórias da potência com C em G e as 118 em B usaram C < 0 (mediana -7,3 níveis em G e -6,3 em B; na potência com C, C < 0 em 100% dos sinais de G), um patamar sem sentido físico (o sinal corrigido do preto não pode ficar abaixo de ~0 além do erro do preto, ~1 a 3 níveis). Com C >= 0 (v0.10.0, sem tocar em nada mais), o placar `cl` vira: G: dupla 207 x potência 2 (antes 70 x 139); B: dupla 198 x potência 12 (antes 92 x 118); R: dupla 218 x potência 4 (antes 176 x 40). O rmse/ruído da dupla com C livre continua 3,6 (R), 4,7 (G) e 2,4 (B). **O que fica de pé:** com C = 0 (`c0`) a potência ainda vence em B (177 x 32) e empata em G, porque ali não há C para imitar a cauda. Ou seja, a indicação de cauda tipo potência existe só com C = 0; com C livre e fisicamente plausível a dupla é o melhor modelo. Isso reforça a decisão P1(a) (a potência fica só como comparação).
+
+**Placar `cl` final (v0.11.0, C >= -1,35):** R dupla 201 x potência 14 x esticada 12 (simples 0); G dupla 197 x potência 12 x esticada 3; B dupla 190 x potência 20 x esticada 2. Com C >= 0 a potência quase não vencia (G 2, B 12); com -1,35 ela pode usar um C ligeiramente negativo e ganha um pouco, mas a dupla continua vencendo em 88 a 93% dos sinais (na v0.9.0, sem limite, a potência vencia 139 em G e 118 em B). O resto do conjunto `c0` não muda.
+
+### 6d. Descritores sem modelo (`luminescencia descritores`, v0.10.0, decisão P3 opção b)
+Grava em `output/tabela/` `descritores.csv` (uma linha por vídeo aceito, as mesmas 236 do `dataset.csv`; junte pela coluna `video`), `dicionario_descritores.csv` e `relatorio_descritores.txt`. **É uma tabela paralela: o `dataset.csv` continua com 106 colunas.** Só usa o sinal medido (`corr_*`), sem ajustar equação nenhuma, e tem descritor nos mesmos sinais que têm ajuste principal (regra do sinal medido, nunca `prop_*`; 227 R, 212 G, 212 B). Colunas `<canal>_md_<descritor>`:
+- `I0` (média dos 3 primeiros pontos da janela), `t50` e `t10` (tempo para I/I0 cair a 50% e a 10%, interpolado; vazio se não cruza na janela ou se o nível-alvo não passa de 3x o ruído), `r_2s`, `r_5s`, `r_10s`, `r_20s`, `r_40s` (I/I0 em tempos fixos; vazio se o sinal já sumiu no ruído antes) e `auc_10s`, `auc_30s` (área sob I/I0, em s). Mais as razões entre canais `razao_I0_*` e `razao_t50_*` (R/G, G/B, R/B) e a flag `<canal>_md_ok`.
+- **Declare sempre a janela:** tempo em s desde 2,5 s do vídeo (`posprocessamento.inicio_ajuste_s`). Parâmetros em `descritores:` no `config.yaml`.
+
+*Resultado nos 236 vídeos (03/11/2026):*
+- **Repetibilidade entre as 5 regravações (CV mediano):** `t50` R 7,8% / G 3,0% / B 3,9%, contra o tau principal 11,3 / 7,5 / 9,1% e o tau C livre 11,3 / 3,7 / 4,5%. `r_2s`, `r_5s`, `auc_10s` e `I0` ficam entre 0,8% e 5,7%. Mais estáveis que o tau com C = 0 nos três canais, e no nível do tau com C livre sem depender de modelo.
+- **Os valores longos não servem para o R:** `r_20s` e `r_40s` têm CV de 35% e 42% no R (o sinal está no ruído), e `r_40s` existe só em 118 dos 227 sinais de R; `t10` fica entre 9% e 15% em todos os canais. Para o R, os descritores confiáveis são `I0`, `t50`, `r_2s`, `r_5s`, `r_10s` e `auc_10s`. **Decisão Q2 (03/11/2026, v0.11.0):** as colunas `R_md_t10`, `R_md_r_20s` e `R_md_r_40s` **continuam na tabela**; só o `dicionario_descritores.csv` ganhou um AVISO na descrição delas (lista em `descritores.nao_confiaveis_R`; `[]` desliga o aviso).
+- **Eles dependem do início da janela, e mais que o tau:** mover o início para 2,0 ou 3,0 s muda `t50` em 9 a 12% (o tau muda ~7%), `t10` 4 a 8%, `r_10s` 5 a 9% e `auc_10s` 3 a 6%. É esperado: I0 é lido no início da janela, e o decaimento não é uma exponencial pura. **Mais repetíveis entre regravações não significa menos dependentes da janela.**
+- Os valores de `t50` aqui (mediana R 3,6 s, G 5,4 s, B 5,9 s; por vídeo e todos os canais com sinal) **não** são os do `graficos_resumo.txt` (4,5 / 5,5 / 7,5 s): o gráfico 4 usa a mediana por proporção em intervalos de 1 s e só os canais com o pó.
+- **Cuidados:** canal sem o pó com sinal também tem descritor (descreve o vazamento de cor); `video`, `amostra`, `grupo`, `num_video` e `proporcao` são `meta` e não podem ser entrada da IA. Não há ligação com `entradas.py` ainda: os descritores não entram nas "entradas da IA" até você decidir (ver P3 em "Pontos em aberto").
 
 ### Gama (D5, v0.9.0): sensibilidade, não padrão
 `modelagem.gama: 2.2` (null desliga) acrescenta o caminho `gama` em `ajustes.csv`: C = 0 sobre `255*((media/255)^g - (piso_video/255)^g)`. Não entra na tabela final. Nos 3282 -> 3933 ajustes, os caminhos antigos ficaram idênticos (diferença máxima de tau 0,0001).
@@ -152,7 +192,11 @@ Como comparar formas diferentes: BIC (penaliza parâmetros) e o erro em relaçã
 ### 7. Gráficos (`luminescencia graficos`, v0.9.0, decisão D4)
 Grava em `output/graficos/`: `1_decaimento_semilog.png` (semilog com os ajustes `c0` e `cl` em um vídeo típico de 6 proporções), `2_tau_cl_vs_c0.png` (tau de `cl` contra `c0`, por canal e por amostra), `3_residuos.png` (resíduo mediano ao longo do tempo) e `4_normalizada.png` (I/I0 por proporção), mais `graficos_resumo.txt` com os números. Escala logarítmica ignora pontos <= 0. Vídeos que saturam depois de 2,5 s não aparecem. `canal_ativo_*` é usado só na legenda.
 
-O que os gráficos mostram (02/11/2026): o tau de `cl` é 0,99x o de `c0` no R, 0,74x no G e 0,68x no B, e as três amostras (A, B, C) ficam alinhadas; o resíduo da dupla **não é ruído branco**: com C = 0 a mediana do resíduo chega a 6x (R), 19x (G) e 10x (B) o ruído, com forma de onda ao longo do tempo; com C livre cai para 1x, 6x e 2x. Ou seja, nenhum dos dois ajustes é uma descrição exata do decaimento (coerente com 6c). Ainda faltam log-log, ln I contra t e 1/I contra t.
+O que os gráficos mostram (02/11/2026): o tau de `cl` é 0,99x o de `c0` no R, 0,74x no G e 0,68x no B, e as três amostras (A, B, C) ficam alinhadas; o resíduo da dupla **não é ruído branco**: com C = 0 a mediana do resíduo chega a 6x (R), 19x (G) e 10x (B) o ruído, com forma de onda ao longo do tempo; com C livre cai para 1x, 6x e 2x. Ou seja, nenhum dos dois ajustes é uma descrição exata do decaimento (coerente com 6c). **Gráficos 5 a 7 (P4, v0.11.0):** `5_log_log.png` (ln I contra ln t; reta = lei de potência), `6_ln_I_vs_t.png` (ln I contra t; reta = exponencial simples) e `7_inverso_1_sobre_I.png` (1/I contra t; reta = decaimento de 2ª ordem). Cada um tem 2 linhas: em cima **C = 0** (I = `corr_*`) e embaixo **C livre** (I = `corr_*` menos o C do ajuste `cl`, com o limite -1,35), por canal e só para canais com o pó; as curvas são a mediana de I/I0 por proporção. No log-log o zero do tempo é o corte do protocolo (`protocolo.instante_queda_s`, 0,5 s): **a inclinação do log-log depende dessa escolha de zero**. O `graficos_resumo.txt` traz, por canal, a inclinação "cedo" e "tarde" de cada transformação e a razão tarde/cedo (1 = reta; janelas em `graficos.janelas_inclinacao`; só pontos acima de 3x o ruído). Mediana da razão, C = 0 / C livre:
+- ln I x t: R 0,69 / 0,69, G 0,38 / 0,49, B 0,36 / 0,49. **A taxa de queda cai com o tempo em todos os canais**: nenhuma exponencial simples serve (coerente com o resto).
+- log-log: R 1,50 / 1,48, G 1,61 / 2,06, B 1,53 / 2,05. A curva dobra para baixo no fim: **uma lei de potência pura com zero no corte do protocolo não é reta** no log-log.
+- 1/I x t: R 1,59 / 1,53, G 1,24 / 2,02, B **1,02** / 1,81. Com C = 0 a curva do B é quase uma reta em 1/I (e a do G se aproxima), o que é coerente com o achado de 6c (potência com expoente ~1 em G e B: `1/(1+t/t0)` dá 1/I linear). Com o C livre subtraído, o 1/I curva para cima. **Cuidado:** a razão do 1/I depende muito de C e da janela, e com 60 s e só estas curvas **não prova mecanismo**; é um indício a levar ao orientador, não uma conclusão.
+- Também foram corrigidos os rótulos sobrepostos do eixo do gráfico 2.
 
 ### Entradas da IA (`entradas.py`, v0.9.0, decisão D1)
 `entradas.caminhos` (`cl`, `c0` ou ambos) e `entradas.canais_sem_po` (true = treino "com"; false = treino "sem") escolhem as colunas de entrada, sempre sem `meta`, `alvo`, `canal_ativo_*`, `usar_no_ajuste_*`, `sat_ate_s` e `excluido_saturacao`. **O "sem" não pode ser definido por "ter o pó"**: na hora de usar a IA ninguém sabe qual canal tem o pó, e esvaziar a coluna só nos canais sem o pó devolveria o alvo à IA (o vazamento corrigido na v0.8.1). Por isso o "sem" é uma regra **medida** (`entradas.limiar_inicio_corr`, por canal, sobre `inicio_corr_*`). Nos dados, os níveis dos dois grupos **se sobrepõem** (G: sem o pó até ~212 níveis, com o pó a partir de ~152; B: 203 contra 157; R: 83 contra 29): com limiares R 40, G 150 e B 150, 40 de 67 ajustes de vazamento no R, 41 de 59 no G e 33 de 57 no B continuam. Então o "sem" medido não equivale a "sem vazamento"; decidir pelo resultado na amostra C.
@@ -192,6 +236,7 @@ luminescencia pos                # 5. Pós-processamento (janela fixa, saturaç�
 luminescencia modelar            # 6a. Ajuste em lote (principal, sensibilidades, gama, c_livre, a_parte)
 luminescencia tabela             # 6b. Tabela final e dicionário de colunas
 luminescencia comparar_modelos   # 6c. Compara simples, dupla, esticada e potência (só análise)
+luminescencia descritores        # 6d. Descritores sem modelo (t50, t10, razões, área): tabela paralela ao dataset
 luminescencia graficos           # 7. Gráficos (semilog, tau cl x c0, resíduos, normalizada)
 ```
 
@@ -211,6 +256,7 @@ analise-luminescencia/
 │   ├── modelar.py           # etapa 6a: ajuste em lote (C = 0, C livre, sensibilidades, gama)
 │   ├── tabela.py            # etapa 6b: tabela final por vídeo
 │   ├── comparacao_modelos.py # etapa 6c: comparação de modelos (só análise)
+│   ├── descritores.py       # etapa 6d: descritores sem modelo (tabela paralela)
 │   ├── graficos.py          # etapa 7: gráficos
 │   ├── entradas.py          # colunas de entrada da IA (D1)
 │   ├── prototipo.py         # protótipo exploratório (ROI + extração + ajuste em poucos vídeos)
@@ -219,7 +265,7 @@ analise-luminescencia/
 ├── config.yaml
 ├── curadoria.csv            # suas decisões por vídeo (versionado)
 ├── output/                  # relatórios, ROIs, CSVs (fora do Git)
-├── tests/                   # test_nomes, test_curadoria, test_consolidacao, test_posprocessamento, test_modelos, test_modelar, test_tabela, test_modelos_extra, test_comparacao_modelos, test_gama, test_entradas, test_graficos
+├── tests/                   # test_nomes, test_curadoria, test_consolidacao, test_posprocessamento, test_modelos, test_modelar, test_tabela, test_modelos_extra, test_comparacao_modelos, test_gama, test_entradas, test_graficos, test_c_minimo, test_descritores, test_graficos_transformacoes
 ├── requirements.txt
 └── README.md
 ```
@@ -236,7 +282,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `scipy` e, desde a v0.9.0, `matplotlib` (gráficos; **acrescente ao `requirements.txt`**: `pip install matplotlib`). Os vídeos não ficam no repositório.
+Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `scipy` e, desde a v0.9.0, `matplotlib` (gráficos; já está no `pyproject.toml` e no `requirements.txt`). Os vídeos não ficam no repositório. O `requirements.txt` (limpo na v0.11.0) lista só os pacotes do projeto com as versões que você usa (`matplotlib`, `numpy`, `opencv-python`, `pandas`, `pytest`, `PyYAML`, `scipy`, `tqdm`); as dependências indiretas o `pip` resolve. Antes ele era uma saída de `pip freeze` em UTF-16, com pacotes alheios e uma linha `-e git+...` presa a um commit; agora é UTF-8.
 
 ## Pontos em aberto
 - **Vídeos fora do padrão:** decididos em 02/11/2026 (ver "Alertas menores aceitos"). Excluídos: `A/3/RG_1_05_v3a`, `B/2/RGB_025_025_1_v2b`, `B/3/RG_075_075_v3b`. Incluído com aviso: `A/2/RG_1_05_v2a`. Pendente: `C/1/RGB_05_05_05_v1a` (pasta C, nome A).
@@ -247,9 +293,10 @@ Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `sci
 - **Viés de grupo pela saturação:** os 5 vídeos `GB_05_1_*a` (amostra A) saturam depois de 2,5 s e saem do ajuste principal, então a proporção G0,5/B1 fica sem a amostra A no treino (B e C continuam). Decidir se aceita, se ajusta à parte ou se começa mais tarde.
 - **Cauda do R no ruído:** em 67 dos 161 vídeos com R, mais de 10% dos pontos corrigidos são <= 0 (nível final mediano do R ~2). Decidir se o R é ajustado só até onde o sinal se distingue do ruído.
 - **Tempo irregular:** os quadros novos chegam a intervalos de 0,067, 0,133 ou 0,2 s (o `tempo_s` vem do índice do contêiner). Avaliar o efeito no ajuste.
-- **Modelo:** a exponencial dupla venceu a simples em 649 dos 651 ajustes principais (a simples preferida quase nunca atinge R² ≥ 0,99). **Novo (6c):** com C = 0, a lei de potência (3 parâmetros) vence a dupla (4) em B e empata em G; o resíduo da dupla tem estrutura (6 a 19x o ruído). Decidir se o principal continua dupla, se a potência entra como terceiro caminho ou se fica só como comparação (hoje: só comparação).
+- **Modelo:** a exponencial dupla venceu a simples em 649 dos 651 ajustes principais (a simples preferida quase nunca atinge R² ≥ 0,99). **Novo (6c):** com C = 0, a lei de potência (3 parâmetros) vence a dupla (4) em B e empata em G; o resíduo da dupla tem estrutura (6 a 19x o ruído). Decidido em 03/11/2026 (P1a): fica só como comparação. A v0.10.0 mostrou que a vantagem da potência com C livre vinha de C negativo (ver 6c); com C = 0 ela ainda vence em B.
+- **Decisões de 03/11/2026 (P1 a P3):** P1(a) a lei de potência continua só como comparação (sem caminho `pot`, o principal não muda); P2: limite no C livre (implementado com C >= 0, **o escopo real era bem maior que os 3 vídeos**; a Q1 fixou **-1,35**, ver 6a); P3(b) descritores sem modelo em tabela paralela (6d). **P4 feita na v0.11.0** (gráficos 5 a 7). Aprovadas mas **ainda não feitas**: P5 (teste do offset cantos/ROI com os vídeos atuais) e P6 (comando `tudo` e relatórios de regressão). Q1, Q2 e Q5 resolvidas na v0.11.0; Q3 (ligar descritores ao `entradas.py`) e Q4 (próximo lote) em andamento.
 - **Decisões de 02/11/2026 (D1 a D6):** D1 tau dos canais sem o pó entra, com chave para desligar (ver "Entradas da IA": a chave só pode ser uma regra medida); D2 os 9 vídeos saturados ficam fora do treino principal, com ajuste à parte só para análise; D3 modelos extras só para comparação; D4 gráficos na ordem 1 a 4; D5 gama só como sensibilidade; D6 `C/1/RGB_05_05_05_v1a` fica de fora até o fim do projeto.
-- **Riscos novos (v0.9.0):** (1) o tau depende da janela e do C, e a potência sugere que não existe um tau intrínseco: declarar sempre a janela e o C ao comparar com outros estudos; (2) `cl` e `c0` são muito correlacionados, treinar com os dois pode favorecer sobreajuste (comparar na amostra C); (3) a sensibilidade de gama não melhora a repetibilidade e depende do processamento da câmera; (4) em 3 vídeos do R (amostra A: `GB_075_075_v1a`, `GB_1_05_v1a`, `RB_05_1_v3a`) o ajuste de C livre dá tau de 80 a 120 s com C de -23 a -33 níveis (patamar negativo, sem sentido físico), visível no gráfico 2 e presente em `R_cl_*` da tabela: revisar antes de treinar; (5) o "sem vazamento" de D1 não é separável por nível de sinal (ver acima).
+- **Riscos novos (v0.9.0):** (1) o tau depende da janela e do C, e a potência sugere que não existe um tau intrínseco: declarar sempre a janela e o C ao comparar com outros estudos; (2) `cl` e `c0` são muito correlacionados, treinar com os dois pode favorecer sobreajuste (comparar na amostra C); com `c_livre_c_minimo: 0` isso piora no R (47% de cópias); (3) a sensibilidade de gama não melhora a repetibilidade e depende do processamento da câmera; (4) em 3 vídeos do R (amostra A: `GB_075_075_v1a`, `GB_1_05_v1a`, `RB_05_1_v3a`) o ajuste de C livre dava tau de 80 a 120 s com C de -23 a -33 níveis (sem sentido físico): **tratado na v0.10.0 com `c_livre_c_minimo`** (ver 6a); com o limite em 0, porém, 47% dos `R_cl_*` viram cópia de `R_c0_*` (por isso a Q1 adotou -1,35: 3% colados); (5) o "sem vazamento" de D1 não é separável por nível de sinal (ver acima); (6) **v0.11.0:** o tau `cl` dos 6 sinais do R colados em C = -1,35 depende do limite (6a); (7) a razão do 1/I no gráfico 7 depende de C, da janela e do zero do tempo.
 - Limites de "suspeito" da ROI, calibrados com os 240 vídeos atuais (nenhum suspeito).
 - Se a checagem de sincronização, no futuro, poderá realinhar o tempo (por padrão, não realinha).
 

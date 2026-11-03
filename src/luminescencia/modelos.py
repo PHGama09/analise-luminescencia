@@ -244,11 +244,25 @@ class Ajuste:
 
 
 def ajustar_modelo(modelo: Modelo, t: np.ndarray, y: np.ndarray, cfg: dict) -> Ajuste:
-    """Ajusta um modelo, testando vários chutes iniciais e ficando com o menor erro."""
+    """Ajusta um modelo, testando vários chutes iniciais e ficando com o menor erro.
+
+    cfg["c_minimo"] (opcional, padrão ausente = sem limite): piso para o patamar C dos modelos que têm C."""
     melhor = None
+    limites = modelo.limites(t, y)
+    c_minimo = cfg.get("c_minimo")
+    if c_minimo is not None and "C" in modelo.params:        # P2 (03/11/2026): patamar C não pode ficar abaixo de c_minimo
+        i = modelo.params.index("C")
+        inf, sup = list(limites[0]), list(limites[1])
+        inf[i] = max(inf[i], float(c_minimo))
+        sup[i] = max(sup[i], inf[i] + 1e-6)
+        limites = (inf, sup)
     for p0 in modelo.chutes(t, y):
+        if c_minimo is not None and "C" in modelo.params:
+            p0 = list(p0)
+            i = modelo.params.index("C")
+            p0[i] = min(max(p0[i], limites[0][i]), limites[1][i])
         try:
-            popt, _ = curve_fit(modelo.func, t, y, p0=p0, bounds=modelo.limites(t, y), max_nfev=20000)
+            popt, _ = curve_fit(modelo.func, t, y, p0=p0, bounds=limites, max_nfev=20000)
         except (RuntimeError, ValueError):
             continue
         sse = float(np.sum((y - modelo.func(t, *popt)) ** 2))

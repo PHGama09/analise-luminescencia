@@ -104,6 +104,9 @@ modelagem:
   duracao_minima_s: 5.0       # sinal que dura menos que isso depois do início não é ajustado
   c_livre_num_video: todos    # C livre em todos os vídeos; um número (1 a 5) limita a esse vídeo de cada grupo
   gama: 2.2                   # sensibilidade (D5): ajuste C = 0 sobre o sinal linearizado pela gama. null desliga. NÃO é o padrão
+  c_livre_c_minimo: -1.35     # Q1 (03/11/2026): patamar C do ajuste C livre não pode ficar abaixo disto (níveis). null desliga (volta ao v0.9.0).
+                              # -1,35 = 3 x 0,45, o erro do preto medido no R (desvio do nível final entre regravações, piso por vídeo). Só o R é afetado
+                              # (6 de 227 colados; G e B têm C positivo). Com 0,0 viravam 106 (47%) e o R_cl copiava o R_c0. Se mudar a sessão, refazer o teste.
   workers: 4
 
 graficos:
@@ -112,6 +115,9 @@ graficos:
   dpi: 130
   bin_residuo_s: 2.0
   bin_normalizada_s: 1.0
+  # P4 (v0.11.0), gráficos 5 a 7: janelas (s desde o início do ajuste) onde se mede a inclinação 'cedo' e 'tarde' de cada transformação
+  janelas_inclinacao: {R: [[2, 6], [8, 14]], G: [[2, 7], [20, 30]], B: [[2, 7], [20, 30]]}   # o R chega ao ruído mais cedo
+  k_ruido_inclinacao: 3.0     # só pontos com I > k x ruído do canal entram nas inclinações
 
 entradas:
   # entradas.py (D1): quais colunas da tabela a IA pode usar. Nunca meta, alvo ou canal_ativo_*.
@@ -119,3 +125,11 @@ entradas:
   canais_sem_po: true         # true = todo canal com ajuste entra (treino "com"). false = só canal com sinal forte (treino "sem"; precisa do limiar)
   limiar_inicio_corr: null    # com canais_sem_po: false, ex.: {R: 40, G: 150, B: 150}. Regra MEDIDA no vídeo; os níveis se sobrepõem (ver entradas.py)
 
+descritores:
+  # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.
+  niveis_queda: [0.5, 0.1]        # t50 e t10: tempo para I/I0 cair a 50% e a 10%
+  tempos_fixos_s: [2, 5, 10, 20, 40]   # I(T)/I0 em T segundos depois do início da janela (vazio se o sinal já sumiu no ruído)
+  horizontes_area_s: [10, 30]     # área sob I/I0 de 0 a H segundos
+  suavizacao_pontos: 5            # mediana móvel só para achar cruzamentos e ler valores em tempos fixos
+  k_ruido_nivel: 3.0              # nível-alvo precisa passar de k x ruído do canal para o cruzamento valer
+  nao_confiaveis_R: [t10, r_20s, r_40s]   # Q2 (03/11/2026): só AVISO no dicionario_descritores.csv (no R o sinal chega ao ruído); a coluna continua na tabela

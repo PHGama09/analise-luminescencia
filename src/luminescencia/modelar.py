@@ -37,12 +37,13 @@ from .posprocessamento import CANAIS, _sufixo, parametros as parametros_pos
 
 MODELOS_C0 = ("exp_simples_c0", "exp_dupla_c0")
 MODELOS_CLIVRE = ("exp_simples", "exp_dupla")
+TOL_LIMITE_C = 0.01          # níveis: C a menos disto do limite conta como "colado no limite"
 PARAMS_COLS = ["A", "tau", "A1", "tau1", "A2", "tau2", "C", "fracao_rapida", "tau_medio", "r2", "rmse", "bic"]
 
 
 def parametros(cfg: dict) -> dict:
     p = {"ruido_k": 3.0, "janela_mediana_pontos": 31, "duracao_minima_s": 5.0, "c_livre_num_video": "todos", "workers": 4,
-         "gama": 2.2}
+         "gama": 2.2, "c_livre_c_minimo": 0.0}
     p.update({k: v for k, v in (cfg.get("modelagem", {}) or {}).items()})
     return p
 
@@ -72,7 +73,8 @@ def fim_util(t: np.ndarray, y: np.ndarray, k: float, janela: int) -> tuple[float
 
 def _um_ajuste(args) -> dict:
     """Ajusta uma série (função de nível de módulo para poder rodar em outro processo)."""
-    ident, t, y, inicio, modelos, k, janela, dur_min = args
+    ident, t, y, inicio, modelos, k, janela, dur_min = args[:8]
+    c_min = args[8] if len(args) > 8 else None                 # só o caminho c_livre usa (P2)
     t, y = np.asarray(t, float), np.asarray(y, float)
     sel = t >= inicio - 1e-9
     t, y = t[sel], y[sel]
@@ -84,8 +86,10 @@ def _um_ajuste(args) -> dict:
     if not fim == fim or fim - t[0] < dur_min:
         return {**L, "fim_s": fim, "modelo": "", "observacao": f"sinal some no ruído antes de {dur_min:g} s de janela"}
     sel = t <= fim + 1e-9
-    r = ajustar_serie(t[sel] - t[0], y[sel], modelos)
+    r = ajustar_serie(t[sel] - t[0], y[sel], modelos, c_minimo=c_min)
     r.pop("n_pontos", None)
+    if c_min is not None and r.get("C") == r.get("C") and r.get("C") is not None:
+        r["C_no_limite"] = bool(r["C"] <= c_min + TOL_LIMITE_C)
     return {**L, "fim_s": round(fim, 3), "n_pontos": int(sel.sum()), **r}
 
 
@@ -115,7 +119,7 @@ def montar_tarefas(series, vpos, vcons, cfg: dict, p: dict, pp: dict) -> list[tu
                     lin = linearizar_gama(g[f"media_{c}"].to_numpy(), v[f"piso_video_{c}"], float(p["gama"]))
                     tarefas.append(({**base, "caminho": "gama"}, t, lin, inicio, MODELOS_C0, k, jan, dur))
                 if str(p["c_livre_num_video"]).lower() in ("todos", "none", "") or int(v["num_video"]) == int(p["c_livre_num_video"]):
-                    tarefas.append(({**base, "caminho": "c_livre"}, t, corr, inicio, MODELOS_CLIVRE, k, jan, dur))
+                    tarefas.append(({**base, "caminho": "c_livre"}, t, corr, inicio, MODELOS_CLIVRE, k, jan, dur, p.get("c_livre_c_minimo")))
             elif v[f"sinal_presente_{c}"] and v["sat_ate_s"] >= inicio:
                 apos = t[t > v["sat_ate_s"] + 1e-9]
                 if len(apos):
@@ -163,6 +167,14 @@ def _relatorio(aj: pd.DataFrame, p: dict, pp: dict) -> str:
             if len(x):
                 L.append(f"  {c}: C = {x['C'].median():.2f}   rmse C=0: {x['rmse_c0'].median():.2f}   rmse C livre: {x['rmse_livre'].median():.2f}   "
                          f"ruído do canal: {aj[(aj['caminho'] == 'principal') & (aj['canal'] == c)]['ruido'].median():.2f}")
+    if p.get("c_livre_c_minimo") is not None and "C_no_limite" in aj:
+        cmin = float(p["c_livre_c_minimo"])
+        L += ["", f"Limite do patamar no C livre: C >= {cmin:g} níveis (modelagem.c_livre_c_minimo; null desliga). Ajustes com C colado no limite (C <= {cmin + TOL_LIMITE_C:g}):"]
+        for c in CANAIS:
+            x = aj[(aj["caminho"] == "c_livre") & (aj["canal"] == c) & (aj["modelo"] != "")]
+            if len(x):
+                n = int(x["C_no_limite"].fillna(False).astype(bool).sum())
+                L.append(f"  {c}: {n} de {len(x)} ({n / len(x):.0%})")
     L += ["", "Sensibilidade: diferença relativa mediana do tau_medio contra o principal (mesmo vídeo e canal):"]
     for cam in sorted(set(aj["caminho"]) - {"principal", "a_parte"}):
         o = _tau_por_canal(aj, cam)
