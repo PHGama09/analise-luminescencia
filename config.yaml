@@ -84,3 +84,38 @@ extracao:
   fator_ruido: 5.0            # canal perto do ruído: (amplitude inicial - piso do vídeo) < fator * piso (provisório)
   janela_fim_s: 10            # o "nível final" do resumo é a mediana dos últimos tantos segundos
   workers: 6
+
+consolidacao:
+  # Programa 4 (consolidacao.py).
+  piso: video                 # video = preto corrigido por vídeo (cantos do vídeo - diferença canto/ROI do controle); referencia = piso fixo do controle
+  incluir_pendentes_ok: true  # incluir = pendente com auditoria ok entra; pendente com alerta fica de fora até você decidir
+
+posprocessamento:
+  # Programa 5 (posprocessamento.py). Não altera valores; só recorta a janela e sinaliza.
+  inicio_ajuste_s: 2.5        # o ajuste começa neste instante, IGUAL para todos os vídeos (cobre ~96% sem saturação)
+  janelas_sensibilidade: [2.0, 2.5, 3.0]   # instantes para o teste de sensibilidade do tau
+  saturacao_pct_max: 0.0      # quadro com saturados_pct acima disto conta como saturado
+  frac_nao_positivo_max: 0.10 # canal com mais que isso dos pontos <= 0 (cauda no ruído) recebe aviso; não é excluído
+
+modelagem:
+  # Programa 6a (modelar.py): ajuste em lote. Sem isto usa os padrões abaixo.
+  ruido_k: 3.0                # o ajuste termina onde a mediana móvel do sinal deixa de passar de k x ruído do canal
+  janela_mediana_pontos: 31   # largura da mediana móvel (~4 s)
+  duracao_minima_s: 5.0       # sinal que dura menos que isso depois do início não é ajustado
+  c_livre_num_video: todos    # C livre em todos os vídeos; um número (1 a 5) limita a esse vídeo de cada grupo
+  gama: 2.2                   # sensibilidade (D5): ajuste C = 0 sobre o sinal linearizado pela gama. null desliga. NÃO é o padrão
+  workers: 4
+
+graficos:
+  # Programa 7 (graficos.py). Vídeo típico = o da proporção com o tau principal mais perto da mediana.
+  proporcoes_tipicas: [B1.5, G1.5, R1.5, G1_B0.5, R1_B0.5, R0.5_G0.5_B0.5]
+  dpi: 130
+  bin_residuo_s: 2.0
+  bin_normalizada_s: 1.0
+
+entradas:
+  # entradas.py (D1): quais colunas da tabela a IA pode usar. Nunca meta, alvo ou canal_ativo_*.
+  caminhos: [cl, c0]          # cl, c0 ou os dois (treinar com só cl, só c0 e ambos)
+  canais_sem_po: true         # true = todo canal com ajuste entra (treino "com"). false = só canal com sinal forte (treino "sem"; precisa do limiar)
+  limiar_inicio_corr: null    # com canais_sem_po: false, ex.: {R: 40, G: 150, B: 150}. Regra MEDIDA no vídeo; os níveis se sobrepõem (ver entradas.py)
+

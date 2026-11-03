@@ -248,6 +248,8 @@ def auditar_video(caminho: Path, cfg: dict, completo: bool = False) -> dict:
             r[chave] = campos.get(chave, "")
         if campos.get("aviso"):
             r["avisos"].append(campos["aviso"])
+        if campos.get("aviso_caixa"):
+            r["avisos"].append(campos["aviso_caixa"])
         if campos.get("correcoes"):
             r["nome_sugerido"] = campos["nome_sugerido"]
             r["revisar"].append({"tipo": "nome", "texto": (

@@ -9,3 +9,4 @@ output/
 .vscode/
 *.egg-info/
 .pytest_cache/
+*.bak

@@ -1,0 +1,53 @@
+MODELAGEM (C = 0)
+============================================================
+Ajustes: 2357   com modelo: 2357
+
+Caminhos e modelo escolhido (contagem):
+  a_parte: {'exp_dupla_c0': 17}
+  c_livre: {'exp_dupla': 468}
+  inicio_2s: {'exp_dupla_c0': 468}
+  inicio_3s: {'exp_dupla_c0': 465, 'exp_simples_c0': 3}
+  piso_fixo: {'exp_dupla_c0': 463, 'exp_simples_c0': 5}
+  principal: {'exp_dupla_c0': 468}
+
+Sem ajuste (motivos):
+  nenhum
+
+Repetibilidade do tau_medio entre as 5 regravações (CV mediano = desvio/média, por proporção e amostra; menor = mais estável):
+  principal: R 12.7%   G 7.7%   B 7.8%
+  c_livre: R 15.3%   G 4.9%   B 3.0%
+
+tau_medio mediano por amostra (diferença entre amostras = possível viés de sessão que a IA poderia aprender):
+  principal: R: A=8.2/B=7.5/C=6.7   G: A=13.9/B=13.7/C=13.8   B: A=18.9/B=19.0/C=17.4
+  c_livre: R: A=8.0/B=7.4/C=6.6   G: A=10.2/B=10.2/C=10.4   B: A=11.8/B=11.9/C=11.6
+
+Patamar C do ajuste livre (níveis, mediana) contra o erro do ajuste (rmse mediano) com C = 0 e com C livre:
+  R: C = 0.17   rmse C=0: 0.22   rmse C livre: 0.18   ruído do canal: 0.06
+  G: C = 4.71   rmse C=0: 0.57   rmse C livre: 0.26   ruído do canal: 0.05
+  B: C = 8.71   rmse C=0: 0.68   rmse C livre: 0.29   ruído do canal: 0.12
+
+Sensibilidade: diferença relativa mediana do tau_medio contra o principal (mesmo vídeo e canal):
+  c_livre: {'R': '5.3% (viés -2.7%, n=160)', 'G': '26.1% (viés -26.1%, n=153)', 'B': '34.3% (viés -34.3%, n=155)'}
+  inicio_2s: {'R': '7.7% (viés -7.7%, n=160)', 'G': '8.1% (viés -8.1%, n=153)', 'B': '6.7% (viés -6.7%, n=155)'}
+  inicio_3s: {'R': '6.1% (viés +6.0%, n=160)', 'G': '6.8% (viés +6.8%, n=153)', 'B': '5.4% (viés +5.4%, n=155)'}
+  piso_fixo: {'R': '8.2% (viés -0.1%, n=160)', 'G': '4.1% (viés -1.2%, n=153)', 'B': '3.4% (viés -0.4%, n=155)'}
+  Regra: se a diferença for MAIOR que o CV entre regravações, o caminho muda o resultado além do ruído.
+
+Ajustados à parte (janela própria; não misturar com o principal):
+  GB_05_1_v1a G: início 3.4 s, exp_dupla_c0, tau_medio 19.1
+  GB_05_1_v1a B: início 3.4 s, exp_dupla_c0, tau_medio 22.8
+  GB_05_1_v2a G: início 3.333 s, exp_dupla_c0, tau_medio 18.5
+  GB_05_1_v2a B: início 3.333 s, exp_dupla_c0, tau_medio 22.1
+  GB_05_1_v3a G: início 3.133 s, exp_dupla_c0, tau_medio 11.9
+  GB_05_1_v3a B: início 3.133 s, exp_dupla_c0, tau_medio 14.3
+  GB_05_1_v4a G: início 3.533 s, exp_dupla_c0, tau_medio 18.9
+  GB_05_1_v4a B: início 3.533 s, exp_dupla_c0, tau_medio 23.4
+  GB_05_1_v5a G: início 3.0 s, exp_dupla_c0, tau_medio 19.0
+  GB_05_1_v5a B: início 3.0 s, exp_dupla_c0, tau_medio 22.5
+  B_15_v1b B: início 2.8 s, exp_dupla_c0, tau_medio 22.1
+  RG_05_1_v3b R: início 13.933 s, exp_dupla_c0, tau_medio 3.4
+  RG_05_1_v3b G: início 13.933 s, exp_dupla_c0, tau_medio 7.3
+  GB_075_075_v4b G: início 3.0 s, exp_dupla_c0, tau_medio 13.5
+  GB_075_075_v4b B: início 3.0 s, exp_dupla_c0, tau_medio 14.4
+  GB_075_075_v5b G: início 2.733 s, exp_dupla_c0, tau_medio 14.3
+  GB_075_075_v5b B: início 2.733 s, exp_dupla_c0, tau_medio 15.7

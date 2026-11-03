@@ -55,6 +55,42 @@ def _cmd_extrair(args, cfg):
                  workers=args.workers, filtro=args.videos)
 
 
+def _cmd_consolidar(args, cfg):
+    from .consolidacao import rodar
+
+    return rodar(cfg, pasta_extracao=args.extracao, saida=args.saida, curadoria=args.curadoria)
+
+
+def _cmd_pos(args, cfg):
+    from .posprocessamento import rodar
+
+    return rodar(cfg, pasta_consolidacao=args.consolidacao, saida=args.saida)
+
+
+def _cmd_modelar(args, cfg):
+    from .modelar import rodar
+
+    return rodar(cfg, pasta_pos=args.pos, pasta_consolidacao=args.consolidacao, saida=args.saida)
+
+
+def _cmd_tabela(args, cfg):
+    from .tabela import rodar
+
+    return rodar(cfg, pasta_modelagem=args.modelagem, pasta_pos=args.pos, pasta_consolidacao=args.consolidacao, saida=args.saida)
+
+
+def _cmd_comparar_modelos(args, cfg):
+    from .comparacao_modelos import rodar
+
+    return rodar(cfg, pasta_pos=args.pos, saida=args.saida)
+
+
+def _cmd_graficos(args, cfg):
+    from .graficos import rodar
+
+    return rodar(cfg, pasta_modelagem=args.modelagem, pasta_pos=args.pos, saida=args.saida)
+
+
 def _nao_implementado(nome):
     def f(args, cfg):
         print(f"O comando '{nome}' ainda não foi implementado.")
@@ -104,9 +140,40 @@ def main(argv=None) -> int:
     p.add_argument("--videos", nargs="+", help="só os vídeos cujo caminho contém algum destes textos (ex.: B_15 RB_075)")
     p.set_defaults(func=_cmd_extrair)
 
-    for nome, texto in [("consolidar", "4. Consolidação"), ("pos", "5. Pós-processamento")]:
-        p = sub.add_parser(nome, parents=[comum], help=f"{texto} (ainda não implementado)")
-        p.set_defaults(func=_nao_implementado(nome))
+    p = sub.add_parser("consolidar", parents=[comum], help="4. Consolidação: vídeos aceitos, preto corrigido por vídeo, formato longo")
+    p.add_argument("--extracao", help="pasta da extração (padrão: output/extracao)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/consolidacao)")
+    p.add_argument("--curadoria", help="curadoria.csv a usar (padrão: curadoria.arquivo do config)")
+    p.set_defaults(func=_cmd_consolidar)
+
+    p = sub.add_parser("pos", parents=[comum], help="5. Pós-processamento: janela fixa do ajuste, saturação, canais usáveis")
+    p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/posprocessamento)")
+    p.set_defaults(func=_cmd_pos)
+
+    p = sub.add_parser("modelar", parents=[comum], help="6. Ajuste em lote (C = 0) com sensibilidades; precisa de 'consolidar' e 'pos'")
+    p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
+    p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/modelagem)")
+    p.set_defaults(func=_cmd_modelar)
+
+    p = sub.add_parser("tabela", parents=[comum], help="6b. Tabela final por vídeo (C livre e C = 0 lado a lado) e dicionário de colunas")
+    p.add_argument("--modelagem", help="pasta da modelagem (padrão: output/modelagem)")
+    p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
+    p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/tabela)")
+    p.set_defaults(func=_cmd_tabela)
+
+    p = sub.add_parser("comparar_modelos", parents=[comum], help="6c. Compara exp simples, dupla, esticada e potência (só análise)")
+    p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/modelagem)")
+    p.set_defaults(func=_cmd_comparar_modelos)
+
+    p = sub.add_parser("graficos", parents=[comum], help="7. Gráficos: semilog com os dois ajustes, tau cl x c0, resíduos, normalizada")
+    p.add_argument("--modelagem", help="pasta da modelagem (padrão: output/modelagem)")
+    p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/graficos)")
+    p.set_defaults(func=_cmd_graficos)
 
     args = parser.parse_args(argv)
     if not args.comando:

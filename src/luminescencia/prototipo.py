@@ -357,7 +357,7 @@ def rodar(cfg: dict, videos: list[str], saida: Path, roi_fixa: bool = False) -> 
         if rois[v]["controle"]:
             fim = df[df["tempo_s"] >= base]
             piso = {k: max(float(fim[col].median()), p["piso_minimo"]) for k, col in canais.items()}
-            print(f"   piso de ruído (controle, mediana na ROI): " + ", ".join(f"{k}={x:.2f}" for k, x in piso.items()))
+            print("   piso de ruído (controle, mediana na ROI): " + ", ".join(f"{k}={x:.2f}" for k, x in piso.items()))
     if not piso:
         print(f"   sem vídeo de controle: piso de ruído assumido = {p['piso_minimo']}")
 

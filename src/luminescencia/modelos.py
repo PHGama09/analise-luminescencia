@@ -35,6 +35,36 @@ def exp_dupla(t, A1, tau1, A2, tau2, C):
     return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + C
 
 
+def exp_simples_c0(t, A, tau):
+    """I(t) = A * exp(-t/tau)        (C fixo em 0: a série já vem sem o preto)"""
+    return A * np.exp(-t / tau)
+
+
+def exp_dupla_c0(t, A1, tau1, A2, tau2):
+    """I(t) = A1 * exp(-t/tau1) + A2 * exp(-t/tau2)        (C fixo em 0)"""
+    return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2)
+
+
+def exp_esticada_c0(t, A, tau, beta):
+    """I(t) = A * exp(-(t/tau)**beta)        (exponencial esticada, C = 0; beta = 1 volta à exponencial simples)"""
+    return A * np.exp(-((t / tau) ** beta))
+
+
+def exp_esticada(t, A, tau, beta, C):
+    """I(t) = A * exp(-(t/tau)**beta) + C"""
+    return A * np.exp(-((t / tau) ** beta)) + C
+
+
+def potencia_c0(t, A, t0, alpha):
+    """I(t) = A * (1 + t/t0)**(-alpha)        (lei de potência, C = 0; cauda sem escala de tempo única)"""
+    return A * (1 + t / t0) ** (-alpha)
+
+
+def potencia(t, A, t0, alpha, C):
+    """I(t) = A * (1 + t/t0)**(-alpha) + C"""
+    return A * (1 + t / t0) ** (-alpha) + C
+
+
 # ---------------------------------------------------------------- registro
 @dataclass
 class Modelo:
@@ -95,6 +125,76 @@ def _limites_dupla(t, y):
     )
 
 
+def _estimativas_c0(t, y):
+    """Amplitude e tau aproximados com C = 0."""
+    amp = max(float(y[0]), 1e-6)
+    abaixo = np.where(y <= amp / np.e)[0]
+    duracao = float(t[-1] - t[0])
+    tau = float(t[abaixo[0]] - t[0]) if len(abaixo) and t[abaixo[0]] > t[0] else duracao / 3
+    return amp, max(tau, duracao / 200)
+
+
+def _chutes_simples_c0(t, y):
+    amp, tau = _estimativas_c0(t, y)
+    return [[amp, tau], [amp, tau * 3], [amp, tau / 3]]
+
+
+def _limites_simples_c0(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    return ([0, passo], [10 * span + 10 * float(np.max(y)), tau_max])
+
+
+def _chutes_dupla_c0(t, y):
+    amp, tau = _estimativas_c0(t, y)
+    return [[amp / 2, tau / 3, amp / 2, tau * 3], [amp / 2, tau / 10, amp / 2, tau * 2], [amp / 2, tau / 2, amp / 2, tau * 10]]
+
+
+def _limites_dupla_c0(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    teto = 10 * span + 10 * float(np.max(y))
+    return ([0, passo, 0, passo], [teto, tau_max, teto, tau_max])
+
+
+def _chutes_esticada_c0(t, y):
+    amp, tau = _estimativas_c0(t, y)
+    return [[amp, tau, 0.8], [amp, tau * 3, 0.6], [amp, tau / 3, 1.0]]
+
+
+def _limites_esticada_c0(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    return ([0, passo, 0.1], [10 * span + 10 * float(np.max(y)), tau_max, 1.0])
+
+
+def _chutes_esticada(t, y):
+    base, amp, tau = _estimativas(t, y)
+    return [[amp, tau, 0.8, base], [amp, tau * 3, 0.6, base], [amp, tau / 3, 1.0, base]]
+
+
+def _limites_esticada(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    return ([0, passo, 0.1, float(np.min(y)) - span], [10 * span + 10 * float(np.max(y)), tau_max, 1.0, float(np.max(y))])
+
+
+def _chutes_potencia_c0(t, y):
+    amp, tau = _estimativas_c0(t, y)
+    return [[amp, tau, 1.0], [amp, tau * 3, 2.0], [amp, tau / 3, 0.5]]
+
+
+def _limites_potencia_c0(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    return ([0, passo, 0.05], [10 * span + 10 * float(np.max(y)), tau_max, 20.0])
+
+
+def _chutes_potencia(t, y):
+    base, amp, tau = _estimativas(t, y)
+    return [[amp, tau, 1.0, base], [amp, tau * 3, 2.0, base], [amp, tau / 3, 0.5, base]]
+
+
+def _limites_potencia(t, y):
+    passo, tau_max, span = _limites_comuns(t, y)
+    return ([0, passo, 0.05, float(np.min(y)) - span], [10 * span + 10 * float(np.max(y)), tau_max, 20.0, float(np.max(y))])
+
+
 def _validar_dupla(p, cfg):
     total = p["A1"] + p["A2"]
     if total <= 0:
@@ -110,6 +210,16 @@ def _validar_dupla(p, cfg):
 MODELOS: dict[str, Modelo] = {
     "exp_simples": Modelo("exp_simples", exp_simples, ("A", "tau", "C"), _chutes_simples, _limites_simples),
     "exp_dupla": Modelo("exp_dupla", exp_dupla, ("A1", "tau1", "A2", "tau2", "C"), _chutes_dupla, _limites_dupla, _validar_dupla),
+    # C fixo em 0 (decidido em 02/11/2026): usar sobre séries com o preto já subtraído (corr_*)
+    "exp_simples_c0": Modelo("exp_simples_c0", exp_simples_c0, ("A", "tau"), _chutes_simples_c0, _limites_simples_c0),
+    "exp_dupla_c0": Modelo("exp_dupla_c0", exp_dupla_c0, ("A1", "tau1", "A2", "tau2"), _chutes_dupla_c0, _limites_dupla_c0, _validar_dupla),
+    # Só para COMPARAÇÃO (decidido em 02/11/2026, D3): não entram no caminho principal nem na tabela final.
+    # Ver comparacao_modelos.py. Em exp_esticada* o "tau" é a escala de tempo e beta o expoente; em potencia_c0 o
+    # "tau" é t0 e alpha o expoente (os nomes de parâmetro ficam em params).
+    "exp_esticada_c0": Modelo("exp_esticada_c0", exp_esticada_c0, ("A", "tau", "beta"), _chutes_esticada_c0, _limites_esticada_c0),
+    "exp_esticada": Modelo("exp_esticada", exp_esticada, ("A", "tau", "beta", "C"), _chutes_esticada, _limites_esticada),
+    "potencia": Modelo("potencia", potencia, ("A", "t0", "alpha", "C"), _chutes_potencia, _limites_potencia),
+    "potencia_c0": Modelo("potencia_c0", potencia_c0, ("A", "t0", "alpha"), _chutes_potencia_c0, _limites_potencia_c0),
 }
 
 PADRAO = {
@@ -149,7 +259,7 @@ def ajustar_modelo(modelo: Modelo, t: np.ndarray, y: np.ndarray, cfg: dict) -> A
 
     popt, sse = melhor
     params = dict(zip(modelo.params, (float(v) for v in popt)))
-    if modelo.nome == "exp_dupla" and params["tau1"] > params["tau2"]:   # componente rápido primeiro
+    if "A1" in params and params["tau1"] > params["tau2"]:   # componente rápido primeiro
         params["A1"], params["A2"] = params["A2"], params["A1"]
         params["tau1"], params["tau2"] = params["tau2"], params["tau1"]
 
@@ -197,7 +307,7 @@ def ajustar_serie(t, y, modelos=("exp_simples", "exp_dupla"), **opcoes) -> dict:
             linha["fracao_rapida"] = p["A1"] / (p["A1"] + p["A2"])
             linha["tau_medio"] = (p["A1"] * p["tau1"] + p["A2"] * p["tau2"]) / (p["A1"] + p["A2"])
         else:
-            linha["tau_medio"] = p["tau"]
+            linha["tau_medio"] = p.get("tau", float("nan"))
     for a in ajustes:                              # comparação entre modelos, sempre visível
         linha[f"r2_{a.modelo}"] = a.r2
         linha[f"bic_{a.modelo}"] = a.bic

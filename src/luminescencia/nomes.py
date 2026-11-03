@@ -16,10 +16,12 @@ Formato dos vídeos de amostra:   <CORES>_<qtd>[_<qtd>[_<qtd>]]_v<N><letra>.avi
 O vídeo de controle (amostra sem luminescência) é reconhecido por uma palavra no
 nome, definida em config.yaml (nomes.controle), por exemplo "referencia".
 
-Erros de digitação simples (espaço sobrando, "__" no lugar de "_", falta do "_" antes do "v",
-maiúsculas/minúsculas fora do padrão) são tolerados: o nome é lido normalmente, mas o resultado
-traz "correcoes" (o que foi ajustado) e "nome_sugerido" (como o arquivo deveria se chamar).
-Quem chama decide o que fazer com isso; este módulo nunca renomeia nada.
+Erros de digitação simples (espaço sobrando, "__" no lugar de "_", falta do "_" antes do "v")
+são tolerados: o nome é lido normalmente, mas o resultado traz "correcoes" (o que foi ajustado)
+e "nome_sugerido" (como o arquivo deveria se chamar).
+Se a única diferença for maiúscula/minúscula (ex.: v4A), o resultado traz só "aviso_caixa", que
+não exige revisão. Com nomes.maiusculas_sao_erro: true no config, isso volta a ser tratado como
+erro de digitação. Quem chama decide o que fazer; este módulo nunca renomeia nada.
 """
 from __future__ import annotations
 
@@ -104,8 +106,12 @@ def ler_nome(nome_arquivo: str, cfg_nomes: dict | None = None) -> tuple[dict | N
     if canonico != normalizado and "maiúsculas/minúsculas" not in correcoes:
         correcoes.append("maiúsculas/minúsculas ajustadas")
     if canonico != stem:
-        campos["correcoes"] = correcoes or ["formato ajustado"]
-        campos["nome_sugerido"] = canonico + Path(nome_arquivo).suffix.lower()
+        so_caixa = canonico.lower() == stem.lower()
+        if so_caixa and not cfg_nomes.get("maiusculas_sao_erro", False):
+            campos["aviso_caixa"] = f"'{stem}' difere de '{canonico}' só em maiúsculas/minúsculas"
+        else:
+            campos["correcoes"] = correcoes or ["formato ajustado"]
+            campos["nome_sugerido"] = canonico + Path(nome_arquivo).suffix.lower()
     soma, tol = cfg_nomes.get("soma_esperada"), cfg_nomes.get("soma_tolerancia", 0.01)
     if soma is not None and abs(sum(valores.values()) - soma) > tol:
         campos["aviso"] = f"soma das quantidades ({sum(valores.values()):g}) difere do esperado ({soma})"
