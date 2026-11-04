@@ -1,6 +1,6 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.11.2).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t) e a escolha de **entradas da IA** (`entradas.py`). Ainda não existem: treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.12.0).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 ## Objetivo
 
@@ -194,6 +194,65 @@ Resultado nos 236 vídeos (03/11/2026):
 - **Limite que a análise expôs:** 53 dos 236 vídeos (22% no total; 22 na amostra C) têm o canto do B **no piso mínimo da extração** (`extracao.piso_minimo` = 1,0; no R são 4, no G 2). O canto real pode ser menor e a correção não consegue seguir a sessão mais escura; além disso, o nível dentro da ROI não pode ficar abaixo de 0. Ligação com a Q1: o erro do preto de 0,3 a 0,6 nível (B em R_15) é da mesma ordem dos 0,45 usados no limite de C (3 x 0,45 = 1,35); um vídeo como `R_15_v4b` (erro 2,0) passaria dele, mas só no B.
 - **O que não se sabe:** se o offset varia por canal, por posição da amostra ou por sessão inteira; só há 14 vídeos testáveis, todos do B. **Para resolver de vez:** 1 a 2 vídeos de controle por sessão de gravação (item 5 de "Depois"). Fica como risco, sem mudar nada agora.
 
+### 6e. Comando `tudo` e conferência de regressão (v0.12.0, P6)
+
+Roda a cadeia de etapas de dados de uma vez, na ordem, cada uma com os padrões do `config.yaml`:
+
+`consolidar → pos → modelar → tabela → comparar_modelos → descritores → graficos`
+
+```
+luminescencia tudo                                   # cadeia inteira
+luminescencia tudo --de tabela --ate descritores     # só um trecho
+luminescencia tudo --com-offset                      # inclui `offset` depois de `descritores`
+luminescencia tudo --no-parar-no-erro                # continua mesmo se uma etapa falhar
+luminescencia tudo --config outro.yaml
+```
+
+- **Fora da cadeia** (usam vídeos ou são lentas): `auditar`, `roi`, `extrair`. Rode-as à parte, antes.
+- `--de ETAPA` / `--ate ETAPA`: primeira e última etapa (nomes dos comandos). Citar `offset` em `--de/--ate` o inclui na cadeia.
+- `--parar-no-erro` (padrão: sim): código ≠ 0 (ou exceção) interrompe; o resumo final mostra qual etapa falhou e quais não rodaram. Com `--no-parar-no-erro` as demais seguem e o código final é 1 se alguma falhou.
+- Imprime o tempo de cada etapa e o total.
+
+#### Carimbo de versão
+
+Depois de cada etapa que terminou com 0, `tudo` acrescenta ao fim do relatório dela:
+
+```
+# --- carimbo luminescencia ---
+versao_codigo: 0.12.0
+config_sha256: <16 primeiros hex do SHA-256 dos bytes do config usado>
+data: AAAA-MM-DD HH:MM
+# --- fim carimbo ---
+```
+
+O bloco é substituído, nunca duplicado: rodar duas vezes deixa um só carimbo. O carimbo é feito pelo `tudo` (as etapas rodadas isoladamente não o gravam). Os relatórios são lidos de `pastas.saida` + os caminhos em `tudo.etapas` do `config.yaml`.
+
+#### Conferência de regressão
+
+```
+luminescencia tudo --gravar-referencia   # roda a cadeia e grava tests/referencia/referencia.json a partir do output/ atual
+luminescencia tudo --conferir            # roda a cadeia e compara o output/ com a referência
+luminescencia tudo --so-conferir         # só compara, sem rodar etapas (logo após gravar, deve dar tudo OK)
+```
+
+A referência guarda, para `output/tabela/dataset.csv`, `output/tabela/descritores.csv`, `output/modelagem/ajustes.csv` e
+`output/modelagem/comparacao_modelos.csv`: nº de linhas, lista de colunas e, por coluna numérica, mediana, média e contagem
+de NaN; mais alguns números tirados por regex dos relatórios (ex.: "Ajustes: N", "com modelo: N", % no limite superior).
+Padrão que não casa só gera aviso. O relatório sai em `output/regressao/relatorio_regressao.txt` (OK, divergências numéricas
+- as 20 piores, divergências estruturais, avisos) e o código de saída é ≠ 0 se algo divergir.
+
+Tolerância em `config.yaml`, seção `tudo:` (`rtol` = 1e-3, `atol` = 1e-9). Valem para mediana e média; nº de linhas, colunas,
+contagem de NaN e números dos relatórios são comparados de forma exata. Fim de linha (LF/CRLF) não conta. Coluna nova ou
+faltando é divergência estrutural, listada à parte.
+
+**Riscos**
+- A conferência só vê o que está na referência: não detecta mudança que preserve linhas, colunas, mediana, média e NaN
+  (ex.: valores trocados de lugar entre linhas, ou erro compensado), nem muda nada em gráficos, vídeos ou colunas não numéricas.
+- Mediana e média dentro de 0,1 % podem esconder poucas linhas muito diferentes.
+- Referência gravada de uma saída errada fica "certa" para sempre: confira o `output/` (relatórios, gráficos) antes de
+  `--gravar-referencia` e regrave a referência (e registre o motivo) quando uma mudança de resultado for intencional.
+- Os padrões regex dos relatórios dependem do texto atual deles; se o texto mudar, vira aviso, não divergência.
+
 ### Gama (D5, v0.9.0): sensibilidade, não padrão
 `modelagem.gama: 2.2` (null desliga) acrescenta o caminho `gama` em `ajustes.csv`: C = 0 sobre `255*((media/255)^g - (piso_video/255)^g)`. Não entra na tabela final. Nos 3282 -> 3933 ajustes, os caminhos antigos ficaram idênticos (diferença máxima de tau 0,0001).
 - O tau cai 60 a 71% (mediana), em boa parte só mudança de escala (uma exponencial simples daria tau/2,2, -55%).
@@ -227,6 +286,9 @@ O que os gráficos mostram (02/11/2026): o tau de `cl` é 0,99x o de `c0` no R, 
 |---|---|
 | **1** | Etapas 1 a 5, com checagem de sincronização simples e as três métricas de cor |
 | **2** | Ajuste de modelos de decaimento, visualizações de curvas e gráficos (será aplicada) |
+| **0.12.0 (P6)** | Comando `tudo` (cadeia de etapas e carimbo de versão) e conferência de regressão (`tests/referencia/`). Última entrega real; é a versão do código |
+
+Nota: 0.13.0/0.14.0 foram revertidas: continham módulos de fachada do lote Q4 (ver "Lote Q4" em "Pontos em aberto").
 
 ## Configuração
 
@@ -275,6 +337,7 @@ analise-luminescencia/
 │   ├── descritores.py       # etapa 6d: descritores sem modelo (tabela paralela)
 │   ├── graficos.py          # etapa 7: gráficos
 │   ├── offset.py            # P5: teste do offset cantos - ROI (só análise)
+│   ├── tudo.py              # 6e: comando tudo (cadeia, carimbo de versão, conferência de regressão)
 │   ├── entradas.py          # colunas de entrada da IA (D1)
 │   ├── prototipo.py         # protótipo exploratório (ROI + extração + ajuste em poucos vídeos)
 │   ├── consolidacao.py      # etapa 4
@@ -282,7 +345,11 @@ analise-luminescencia/
 ├── config.yaml
 ├── curadoria.csv            # suas decisões por vídeo (versionado)
 ├── output/                  # relatórios, ROIs, CSVs (fora do Git)
-├── tests/                   # test_nomes, test_curadoria, test_consolidacao, test_posprocessamento, test_modelos, test_modelar, test_tabela, test_modelos_extra, test_comparacao_modelos, test_gama, test_entradas, test_graficos, test_c_minimo, test_descritores, test_graficos_transformacoes, test_offset
+├── scripts/
+│   └── cab.py               # script auxiliar (fora do pacote)
+├── docs/                    # reproduzir.md e protocolo_validacao_rascunho.md (RASCUNHOS, não validados)
+├── tests/                   # test_nomes, test_curadoria, test_consolidacao, test_posprocessamento, test_modelos, test_modelar, test_tabela, test_modelos_extra, test_comparacao_modelos, test_gama, test_entradas, test_graficos, test_c_minimo, test_descritores, test_graficos_transformacoes, test_offset, test_tudo, test_tudo_regressao
+│   └── referencia/          # referencia.json: referência da conferência de regressão (6e)
 ├── requirements.txt
 └── README.md
 ```
@@ -316,6 +383,17 @@ Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `sci
 - **Riscos novos (v0.9.0):** (1) o tau depende da janela e do C, e a potência sugere que não existe um tau intrínseco: declarar sempre a janela e o C ao comparar com outros estudos; (2) `cl` e `c0` são muito correlacionados, treinar com os dois pode favorecer sobreajuste (comparar na amostra C); com `c_livre_c_minimo: 0` isso piora no R (47% de cópias); (3) a sensibilidade de gama não melhora a repetibilidade e depende do processamento da câmera; (4) em 3 vídeos do R (amostra A: `GB_075_075_v1a`, `GB_1_05_v1a`, `RB_05_1_v3a`) o ajuste de C livre dava tau de 80 a 120 s com C de -23 a -33 níveis (sem sentido físico): **tratado na v0.10.0 com `c_livre_c_minimo`** (ver 6a); com o limite em 0, porém, 47% dos `R_cl_*` viram cópia de `R_c0_*` (por isso a Q1 adotou -1,35: 3% colados); (5) o "sem vazamento" de D1 não é separável por nível de sinal (ver acima); (6) **v0.11.0:** o tau `cl` dos 6 sinais do R colados em C = -1,35 depende do limite (6a); (7) a razão do 1/I no gráfico 7 depende de C, da janela e do zero do tempo; (8) **v0.11.2 (P5):** o offset cantos/ROI não é constante em todos os vídeos (`R_15_v4b` erra +2,0 níveis no B) e 53 vídeos têm o canto do B no piso mínimo da extração.
 - Limites de "suspeito" da ROI, calibrados com os 240 vídeos atuais (nenhum suspeito).
 - Se a checagem de sincronização, no futuro, poderá realinhar o tempo (por padrão, não realinha).
+
+### Lote Q4 (pendente, NÃO realizado)
+
+Nenhum resultado dessas análises existe; qualquer afirmação anterior sobre elas foi removida.
+
+- **B5:** deriva de sessão A/B/C.
+- **B13:** colinearidade das entradas.
+- **C17:** protocolo de validação (existe só um rascunho em `docs/protocolo_validacao_rascunho.md`, escrito sem dados e não validado).
+- **B12:** fim de janela do R.
+- **B11:** saturados `a_parte`.
+- **C15:** testes de integração reais.
 
 ## Alertas menores aceitos (revisar se o método mudar)
 

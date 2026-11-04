@@ -10,3 +10,8 @@ output/
 *.egg-info/
 .pytest_cache/
 *.bak
+conferencia_v*/
+pytest.txt
+cabecalhos.txt
+*.zip
+alteracoes*/

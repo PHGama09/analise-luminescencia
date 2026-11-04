@@ -1,3 +1,5 @@
+> **RASCUNHO escrito sem dados; não foi validado nem discutido com o Pedro; ver pendência Q4/C17**
+
 # Protocolo de Validação (Fase 1)
 
 ## 1. Objetivo e Alvo

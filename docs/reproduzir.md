@@ -1,3 +1,5 @@
+> **RASCUNHO escrito sem dados; não foi validado nem discutido com o Pedro; ver pendência Q4/C17**
+
 # Guia de Reprodução - Projeto Luminescência
 
 Passo a passo para reproduzir as análises e a consolidação:

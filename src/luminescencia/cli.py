@@ -103,18 +103,6 @@ def _cmd_graficos(args, cfg):
 
     return rodar(cfg, pasta_modelagem=args.modelagem, pasta_pos=args.pos, saida=args.saida)
 
-def _cmd_deriva(args, cfg):
-    from luminescencia import deriva
-    res = deriva.analisar_deriva()
-    print("Análise de deriva concluída com sucesso:", res)
-    return 0
-
-def _cmd_colinearidade(args, cfg):
-    from luminescencia import colinearidade
-    pares = colinearidade.analisar_colinearidade()
-    print("Análise de colinearidade concluída. Pares encontrados:", pares)
-    return 0
-
 def _cmd_tudo(args, cfg):
     from .tudo import rodar
 
@@ -220,17 +208,6 @@ def main(argv=None) -> int:
     p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/offset)")
     p.set_defaults(func=_cmd_offset)
-
-    p = sub.add_parser("deriva", parents=[comum], help="B5. Análise de deriva de sessão A/B/C por proporção")
-    p.add_argument("--dataset", help="dataset.csv a usar (padrão: dataset.csv)")
-    p.add_argument("--descritores", help="descritores.csv a usar (padrão: descritores.csv)")
-    p.add_argument("--saida", help="pasta de saída (padrão: output/deriva)")
-    p.set_defaults(func=_cmd_deriva)
-
-    p = sub.add_parser("colinearidade", parents=[comum], help="B13. Análise de correlação e colinearidade das entradas")
-    p.add_argument("--dataset", help="dataset a usar")
-    p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade)")
-    p.set_defaults(func=_cmd_colinearidade)
 
     p = sub.add_parser("tudo", parents=[comum], help="6e. Roda a cadeia consolidar -> ... -> graficos e carimba a versão nos relatórios")
     p.add_argument("--de", choices=NOMES_ETAPAS, help="primeira etapa a rodar (padrão: consolidar)")
