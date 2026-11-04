@@ -188,3 +188,39 @@ colinearidade:
     so_tau: ['^[RGB]_(cl|c0)_(tau1|tau2|tau_medio|fracao_rapida|A1|A2|C)$']
     misto: ['^[RGB]_(cl|c0)_(tau1|tau2|tau_medio|fracao_rapida|A1|A2|C)$', '^[RGB]_md_', '^razao_', '^(inicio|final)_corr_[RGB]$']
   dpi: 120
+
+# Q4/B12 (v0.13.0, janela_r.py): fim de janela específico do R. Só sensibilidade; não muda o padrão (modelagem.ruido_k) nem o dataset.
+janela_r:
+  canal: R
+  regras:                     # fim = onde a mediana móvel deixa de passar de k x ruído; duracao_max_s limita o fim a início + duração. A regra do pipeline (k = modelagem.ruido_k) entra sempre
+    - {k: 4}
+    - {k: 5}
+    - {k: 6}
+    - {k: 3, duracao_max_s: 20}
+    - {k: 3, duracao_max_s: 30}
+  min_n_por_grupo: 3          # regravações válidas exigidas por proporção x amostra para entrar no CV
+  dt_fim_min_s: 0.05          # diferença de fim de janela que conta como "mudou" no relatório
+  t50_pontos_i0: 5            # t50 sem modelo: I0 = mediana dos primeiros pontos
+  t50_suavizacao_pontos: 5    # e mediana móvel desta largura
+  workers: null               # null = modelagem.workers (limitado ao número de CPUs)
+  criterios:                  # limiares de DECISÃO da recomendação (não são resultados): a regra tem de atender todos
+    max_aumento_nao_ajustavel: 0.02   # fração de sinais que podem deixar de ser ajustáveis, a mais que a regra atual
+    melhora_cv_minima: 0.10           # CV mediano do tau (cl e c0) precisa cair pelo menos esta fração
+    max_piora_discrepancia: 0.0       # a diferença mediana cl x c0 não pode aumentar
+
+# Q4/B11 (v0.13.0, saturados.py): vídeos saturados (a_parte) x irmãos reajustados na MESMA janela. Só análise; não muda o dataset.
+saturados:
+  min_irmaos: 3               # irmãos com ajuste válido exigidos para haver base de comparação
+  z_comparavel: 2.0           # LIMIARES DE DECISÃO (não são resultados): z = (razão saturado/mediana dos irmãos - 1) / CV dos irmãos
+  z_duvidoso: 3.0             # |z| <= z_comparavel: comparável; <= z_duvidoso: duvidoso; acima: não usar
+  cv_piso: 0.02               # CV mínimo no z (3 a 5 regravações podem dar CV perto de zero por acaso)
+  razao_maxima_comparavel: 0.20   # |razão - 1| acima disto nunca é "comparável" (protege contra irmãos muito dispersos, onde o z fica pequeno com razão enorme)
+  calibrar_pelos_irmaos: true # os limites sobem até o maior |z| de um irmão contra os demais (quando há mais irmãos que min_irmaos)
+  metricas_veredito: [tau_medio, t50]   # grandezas que decidem; I0 é só informativo (depende do instante da janela)
+  fracao_canal_decisao: 0.5   # canal decide se esta fração dos vídeos da proporção (sem saturação) o usa no ajuste (videos_pos)
+  outras_amostras_limita_a_duvidoso: true   # sem irmãos na mesma amostra, a comparação com outras amostras carrega a deriva de sessão
+  min_n_por_amostra: 3        # grupo proporção x amostra com menos vídeos de treino que isto entra no efeito_grupo
+  tolerancia_borda_quadros: 2 # o vídeo cobre a janela se seus quadros ficam a até este nº de passos das bordas (os vídeos têm fase de quadro diferente)
+  t50_pontos_i0: 5            # t50 sem modelo: I0 = mediana dos primeiros pontos da janela
+  t50_suavizacao_pontos: 5    # e mediana móvel desta largura
+  workers: null               # null = modelagem.workers (limitado ao número de CPUs)

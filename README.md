@@ -388,6 +388,87 @@ Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `sci
 
 Nada muda em `dataset.csv`/`descritores.csv`. Cada módulo lê `output/tabela/` e grava em `output/<nome>/` com relatório `.txt`; nenhum número ou conclusão está no código (as frases do relatório são montadas dos CSVs; os testes usam dados sintéticos de resposta conhecida). Seções novas no `config.yaml`: `deriva`, `colinearidade`. Testes: 108 + 21 = **129** (esperado; ver "Não verificado").
 
+### Q4/B12 — Fim de janela específico do R (`luminescencia janela_r`, v0.13.0)
+
+Só sensibilidade: reajusta os 227 sinais do R (C livre com C ≥ −1,35 e C = 0, mesmo critério simples/dupla do `modelar`, início em 2,5 s) com outras regras de fim de janela. **Nenhum número de `dataset.csv`/`descritores.csv` mudou e o padrão (`modelagem.ruido_k` = 3) não foi alterado.** Saída em `output/janela_r/` (`resumo_regras.csv`, `sinais.csv`, `relatorio_janela_r.txt`). Seção `janela_r` do `config.yaml`.
+
+**Conferência:** a regra atual (3 × ruído) reproduz o `ajustes.csv` do `modelar` (227 sinais, maior diferença relativa do τ_médio 8·10⁻⁷ em C = 0 e 5·10⁻⁷ em C livre).
+
+**Medido (R, 227 sinais; CV = mediana do CV do τ_médio entre as 5 regravações, 47 grupos proporção × amostra):**
+
+| regra | duração mediana (s) | CV τ cl | CV τ c0 | \|Δτ\| mediano vs 3× cl / c0 | C colado no limite (cl) | \|τcl/τc0 − 1\| mediano |
+|---|---|---|---|---|---|---|
+| 3× (atual) | 42,4 | 11,8% | 11,3% | — | 2,6% | 6,2% |
+| 4× | 41,7 | 11,9% | 11,3% | 0,1% / 0,0% | 3,1% | 6,3% |
+| 5× | 41,0 | 11,9% | 11,3% | 0,2% / 0,0% | 3,1% | 6,4% |
+| 6× | 38,9 | 12,0% | 11,3% | 0,3% / 0,1% | 3,5% | 6,5% |
+| 3× + máx. 20 s | 20,0 | 13,1% | 10,4% | 7,6% / 1,4% | 12,8% | 9,7% |
+| 3× + máx. 30 s | 29,9 | 11,7% | 11,2% | 2,4% / 0,3% | 9,3% | 8,4% |
+
+- **Nenhum sinal deixa de ser ajustável em nenhuma regra** (0 de 227), nem com 6×.
+- **A "cauda no ruído" não está dentro da janela atual:** 123 dos 227 sinais têm > 10% dos pontos ≤ 0 na série inteira (aviso do `pos`), mas dentro da janela do ajuste (já cortada em 3 × ruído) nenhum tem. O aviso do `pos` descreve a série inteira, não o que o ajuste usa.
+- **t50 (sem modelo) não muda com o fim da janela:** t50 mediano 3,81 s e CV 7,3% idênticos em todas as regras (ele acontece no começo do sinal; só dependeria do fim se a regra cortasse antes de 50%, o que não ocorre). O t50 foi reimplementado no módulo (o `descritores.py` não veio no zip); serve só para comparar regras.
+- rmse/ruído: 2,8 (cl) e 3,8 (c0) na regra atual, quase igual em 4×–6×. Cair para 3,2 em 20 s (c0) é efeito de janela curta, não ajuste melhor.
+- Janela fixa curta piora o C livre: τ cl cai 7,6% (20 s) e C colado no limite sobe de 2,6% para 12,8%.
+
+**Decisão sugerida:** manter 3 × ruído. Nenhuma regra alternativa atende os critérios do config (CV do τ cl e c0 cair ≥ 10% sem aumentar a diferença cl × c0 nem os sinais não ajustáveis): 4×–6× mudam menos de 0,5% o τ mediano e não melhoram o CV; 20 s/30 s mudam o τ cl e aumentam a diferença cl × c0 e o C colado. **Mudança no dataset se mantida a regra atual: nenhuma.** Para referência, 3× + máx. 30 s (a de menor CV médio) mudaria o fim da janela em 154 de 227 sinais, o τ cl em até 68,8% (37 sinais com > 10%) e o τ c0 em até 15,7% (1 sinal), afetando as colunas `R_cl_*` e `R_c0_*`.
+
+**Riscos/limites:** (1) CV com n = 5 regravações por grupo é ruidoso; diferenças de 0,1–0,5 ponto percentual do CV não distinguem regras. (2) "Duração máxima" aqui = início + duração, combinada com a regra de ruído (nunca estica o fim além do sinal). (3) Só o R foi testado; G e B têm outra relação sinal/ruído.
+
+## Q4/B11 — Saturados (`a_parte`) × restante (v0.13.0; `saturados.py`, comando `saturados`)
+
+**O que faz (só análise; não muda `dataset.csv` nem `descritores.csv`).** Os 9 vídeos saturados têm ajuste só em `a_parte` (janela própria: 1º quadro depois da última saturação). Para cada saturado × canal, os irmãos (mesma proporção, outros vídeos sem quadro saturado na janela) são **reajustados na mesma janela [início, fim] do saturado** (C = 0, mesmos modelos do pipeline) e comparados em τ médio, `t50` e `I0`: razão saturado/mediana dos irmãos e posição z = (razão − 1)/CV dos irmãos. Base preferida: mesma amostra; sem irmãos suficientes (< 3) usa as outras amostras, limitada a "duvidoso" (carrega a deriva de sessão). Veredito do vídeo = pior canal de decisão (canal usado pela maioria dos vídeos da proporção sem saturação). Efeito no grupo: reajusta todos os vídeos numa janela comum e põe a razão entre amostras da proporção alvo contra a mesma razão das outras proporções.
+Rodar: `luminescencia saturados` → `output/saturados/` (`relatorio_saturados.txt`, `veredito_video.csv`, `veredito_canal.csv`, `comparacao.csv`, `irmaos_ajustes.csv`, `saturados_janelas.csv`, `treino_por_grupo.csv`, `efeito_grupo.csv`). Leva ~15 s.
+
+**Conferência.** A janela e o τ do saturado recalculados reproduzem o `ajustes.csv` (`a_parte`) em 27/27 ajustes (diferença relativa máxima 4e-9).
+
+**Resultado medido (limiares do config: |z| ≤ 2 comparável, ≤ 3 duvidoso; |razão − 1| > 0,20 nunca é comparável).**
+
+| vídeo | início (s) | veredito | motivo medido |
+|---|---|---|---|
+| GB_05_1_v1a | 3,40 | não usar | G e B ok (razão 1,02); R: τ ×1,42, t50 ×1,24 |
+| GB_05_1_v2a | 3,33 | comparável | razões 0,81–1,02, |z| < 1 |
+| GB_05_1_v3a | 3,13 | não usar | G/B: τ ×0,62, t50 ×0,82 (z ≈ −8); base só outras amostras |
+| GB_05_1_v4a | 3,53 | comparável | razões 0,96–1,02 |
+| GB_05_1_v5a | 3,00 | duvidoso | razões ≈ 1, mas sem irmão válido na mesma amostra |
+| B_15_v1b | 2,80 | comparável | razões 0,90–1,05 |
+| RG_05_1_v3b | 13,93 | não usar | τ ×0,16–0,24; a janela começa aos 14 s |
+| GB_075_075_v4b | 3,00 | duvidoso | G ×1,25, B ×1,30 (z ≈ 1,3, mas > 20%) |
+| GB_075_075_v5b | 2,73 | não usar | G ×1,39, B ×1,48 (z ≈ 20) |
+
+**G0.5_B1.** Hoje a amostra A tem **0** vídeos de treino (os 5 saturam). Com os comparáveis passa a 2; com comparáveis + duvidosos, a 3 (B e C têm 5 cada). Na janela comum (3,53 s até 19,6 s no R, 59,9 s em G/B), a razão A/B do τ é 0,93 (R), 0,94 (G) e 0,97 (B), contra 1,15, 1,02 e 1,07 (medianas) nas outras proporções: z entre −1,2 e −0,5 (percentil 7 a 14) → A de G0.5_B1 **não destoa** da deriva A/B normal (idem A/C, `t50` e `I0`). Ou seja, o grupo A não parece ser um outlier de sessão; mas o τ de A fica um pouco menor que o de B, no sentido oposto à mediana das outras proporções.
+
+**Riscos / honestidade.**
+- Os limiares de decisão são conservadores demais para o espalhamento natural: entre irmãos da mesma amostra o maior |z| de um irmão contra os demais tem mediana ≈ 4,9 (máx. ≈ 19), acima de `z_comparavel` = 2. Por isso `calibrar_pelos_irmaos` sobe os limites até esse valor quando há mais de 3 irmãos, e `razao_maxima_comparavel` impede "comparável" com diferença grande de nível. Vereditos perto da borda (v1a pelo R, v4b/G e B) dependem dessas escolhas.
+- O veredito de v1a vem só do R (canal fraco em G/B); G e B dele são comparáveis. Se o R for desconsiderado nessas proporções, v1a passaria a comparável (decisão do Pedro).
+- v3a e v5a: poucos ou nenhum irmão válido na mesma amostra (os outros A saturam até depois do início da janela); a base é "outras amostras", confundida pela deriva.
+- Mesmo "comparável", o τ/`t50` do `a_parte` vem de janela mais tardia (3–3,5 s contra 2,5 s) e de t = 0 deslocado: **nunca misturar com o principal sem a flag `a_parte`**; τ depende de janela (já medido). `I0` só informativo (depende do instante da janela).
+- Nada foi aplicado ao dataset: usar os 2 a 3 vídeos comparáveis/duvidosos de GB_05_1 no treino exige decisão e reajuste explícitos.
+
+## Q4/C15 — Teste de integração e guia de reprodução (v0.13.0)
+
+**O que entra.** `tests/test_integracao.py` (11 testes, 10 rodam sem a extração real; ~5 s no total) e `docs/reproduzir.md` (substitui o rascunho). Nenhum código de produção foi alterado; versão mantida em 0.13.0 (`__init__.py` e `pyproject.toml` entregues sem mudança).
+
+**Como funciona.** Um gerador escreve em `tmp_path` um CSV por vídeo com as 18 colunas e a ordem do `B_15_v1a.csv` (excitação 100% saturada, depois decaimento; ~metade dos quadros descartados como repetidos; ruído gaussiano de 0,04 nível), o `extracao_resumo.csv` e o vídeo de controle. Cenário: amostras A e B × proporções `B_15` (B) e `GB_05_1` (G e B) × 2 regravações (a 2ª com τ 3% maior) + controle = 8 vídeos aceitos; o preto da sessão B é 0,5 nível acima do da A. Roda `consolidar → pos → modelar → tabela` pelas funções `rodar` (config real lido de `config.yaml`, `modelagem.workers: 1`).
+
+**O que é verificado (respostas conhecidas).**
+- Formas: 8 vídeos aceitos (controle fora), `series.csv` com todas as linhas, `videos_pos` 8, `ajustes.csv` com exatamente 6 caminhos × (vídeo, canal com pó) = 72 linhas, `dataset` 8 × 106 e `videos_pos` 39 colunas (mesmo layout das tabelas reais), dicionário cobrindo todas as colunas, canal sem pó sem τ.
+- Preto por vídeo: `piso_video_*` recupera o preto verdadeiro da sessão (±0,01).
+- τ recuperado: τ médio (C = 0 e C livre) contra o valor analítico da janela que começa em ≥ 2,5 s. **Erro medido ≤ 1,3%** (tolerância 5% para c0, 8% para cl); τ da componente lenta ±10% (medido ≤ 0,05%). A regravação com τ 3% maior sai maior em todos os casos.
+- Vazamento: `prop_*`, `canal_ativo_*`, `usar_no_ajuste_*`, `sat_ate_s`, `excluido_saturacao` e meta nunca têm papel `feature` no dicionário; e `entradas.colunas_de_entrada` não devolve nenhuma delas nas três combinações de caminho (`cl`, `c0`, ambos).
+- Determinismo: duas execuções completas em pastas diferentes dão tabelas idênticas (`assert_frame_equal` exato e bytes iguais em `dataset.csv`).
+- As etapas sem a anterior falham com `FileNotFoundError`.
+
+**Sensibilidade confirmada.** Mutação temporária (ignorar o offset cantos − ROI na `corrigir_preto`) faz `test_preto_por_video_recuperado` falhar (0,7 esperado, 1,6 obtido). Os testes de τ **não** pegam esse erro de ~0,9 nível porque o efeito em τ fica abaixo de 5% neste sinal forte: a proteção do preto é o teste do preto, não o do τ.
+
+**Limites e riscos.**
+- Não pude rodar `test_sem_vazamento_nas_entradas` aqui: `entradas.py` não veio no zip, então ele aparece como *skipped*; no repositório ele roda (usa só `parametros` e `colunas_de_entrada`, como em `test_entradas.py`). Se a assinatura dessas funções for diferente do que `test_entradas.py` mostra, ajuste esse teste. Também não executei `tudo` (`tudo.py` não veio no zip): os comandos do `reproduzir.md` foram descritos a partir de `cli.py` e `config.yaml`; confirme o `--so-conferir` no seu repositório.
+- O cenário sintético não cobre saturação (`a_parte`), curadoria com decisões, amostra C, canal R nem ruído não gaussiano; `ajustes.csv` sintético não tem `A` e `tau` (só aparecem com exp. simples, que o BIC não escolhe aqui). A ordem das colunas de `consolidacao/videos.csv` depende da ordem do `extracao_resumo.csv`, que o gerador só imita.
+- A tolerância de τ (5%/8%) tem folga de ~4× sobre o erro medido; se o ajuste for alterado de propósito, reveja.
+- **Nenhum bug de produção apareceu.** Observação só de leitura: o relatório da tabela imprime a nota sobre canal sem pó ajustado mesmo quando todos os canais ajustados têm pó (cosmético).
+- Se o `tudo --gravar-referencia` for preciso depois, avise: não toquei em `tests/referencia/`.
+
+
 **`luminescencia deriva` (B5).** Células = proporção × canal (ou razão entre canais) × grandeza (`I0`, `t50`, `r_5s`, `auc_10s`, τ médio `cl` e `c0`, `razao_I0`, `razao_t50`); "canal com sinal" = mediana de `inicio_corr_<canal>` da proporção ≥ 20 níveis e ≥ 3 regravações válidas por amostra (regra medida, sem `prop_*`). Teste por célula: permutação sobre eta² em log (5000, semente 12345) + Kruskal-Wallis; célula marcada com p < 0,05 e eta² ≥ 0,30. 332 células (27 descartadas: `G0.5_B1` sem amostra A; R de `B1.5`; G e B de `R1.5`).
 - **Existe deriva e é maior que o CV entre regravações:** 166 de 332 células marcadas (acaso ≈ 17). Diferença relativa mediana entre amostras 9,4% contra CV mediano 5,3%; d mediano 1,65 contra 0,83 esperado sem deriva.
 - **Por grandeza (fração marcada; diferença entre amostras / CV):** `I0` 81% (17,3% / 3,3%), `razao_I0` 65% (6,5% / 3,2%), `auc_10s` 48% (4,0% / 2,5%), `t50` 45% (9,0% / 5,5%), `r_5s` 45% (4,6% / 3,0%), τ `cl` e `c0` 40% (12,7% / 8,1% e 14,3% / 11,9%), `razao_t50` 35% (7,1% / 5,3%). Nenhuma grandeza fica no nível do acaso (5%). Variância em log: 65–97% entre proporções, 2–18% entre amostras, 2–19% entre regravações. A composição ainda domina, mas a deriva não é desprezível frente ao ruído de regravação.

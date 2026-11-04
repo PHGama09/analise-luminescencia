@@ -115,6 +115,18 @@ def _cmd_colinearidade(args, cfg):
     return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida)
 
 
+def _cmd_janela_r(args, cfg):
+    from .janela_r import rodar
+
+    return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, pasta_tabela=args.tabela, saida=args.saida)
+
+
+def _cmd_saturados(args, cfg):
+    from .saturados import rodar
+
+    return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, saida=args.saida)
+
+
 def _cmd_tudo(args, cfg):
     from .tudo import rodar
 
@@ -230,6 +242,20 @@ def main(argv=None) -> int:
     p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e os dicionários (padrão: output/tabela)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade)")
     p.set_defaults(func=_cmd_colinearidade)
+
+    p = sub.add_parser("janela_r", parents=[comum], help="Q4/B12. Fim de janela específico do R: reajusta o R com outras regras de fim e compara tau, t50, CV e ajustabilidade (só análise)")
+    p.add_argument("--pos", help="pasta com series_pos.csv e videos_pos.csv (padrão: output/posprocessamento)")
+    p.add_argument("--modelagem", help="pasta com ajustes.csv, só para conferir a regra atual (padrão: output/modelagem)")
+    p.add_argument("--tabela", help="pasta com dataset.csv, só para listar colunas afetadas (padrão: output/tabela)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/janela_r)")
+    p.set_defaults(func=_cmd_janela_r)
+
+    p = sub.add_parser("saturados", parents=[comum], help="Q4/B11. Saturados (a_parte) x irmãos reajustados na mesma janela: tau, t50, I0, veredito por vídeo e efeito no grupo (só análise)")
+    p.add_argument("--pos", help="pasta com series_pos.csv e videos_pos.csv (padrão: output/posprocessamento)")
+    p.add_argument("--modelagem", help="pasta com ajustes.csv, só para conferir o caminho a_parte (padrão: output/modelagem)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/saturados)")
+    p.set_defaults(func=_cmd_saturados)
+
 
     p = sub.add_parser("tudo", parents=[comum], help="6e. Roda a cadeia consolidar -> ... -> graficos e carimba a versão nos relatórios")
     p.add_argument("--de", choices=NOMES_ETAPAS, help="primeira etapa a rodar (padrão: consolidar)")

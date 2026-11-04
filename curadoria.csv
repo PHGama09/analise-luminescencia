@@ -104,7 +104,7 @@ sha1:d6de9fdd4dab687e369a2ed16e2bb4c80ffd80b0,Amostras B/2/G_15_v2b.avi,ok,pende
 sha1:64a5e8075cc11bbd9913faf40572b6ca3fb87ed0,Amostras B/2/RB_05_1_v2b.avi,ok,pendente,,,,
 sha1:c9a96c198ff585e8749af13a4e1c655c6dcfadc7,Amostras B/2/RB_075_075_v2b.avi,ok,pendente,,,,
 sha1:c51e9a84e1347e7e6a9598d133d83625331e7d91,Amostras B/2/RB_1_05_v2b.avi,ok,pendente,,,,
-sha1:abf1b6ef6da26b9ea4bddbc69e2b5b10f98833a6,Amostras B/2/RGB_025_025_1_v2b.avi,fora_do_padrao,nao,erro_de_gravacao,,,"62% de quadros repetidos; dados reais só até ~43,9 s (343 quadros novos); falta a cauda que define a constante C."
+sha1:abf1b6ef6da26b9ea4bddbc69e2b5b10f98833a6,Amostras B/2/RGB_025_025_1_v2b.avi,ok,nao,erro_de_gravacao,,,"62% de quadros repetidos; dados reais só até ~43,9 s (343 quadros novos); falta a cauda que define a constante C."
 sha1:9166e45a3d1800a4010d3490d1be3c823d0cd803,Amostras B/2/RGB_025_1_025_v2b.avi,ok,pendente,,,,
 sha1:b0d4664d5f43a9ef4e54c45130fc0b7004c5852c,Amostras B/2/RGB_05_05_05_v2b.avi,ok,pendente,,,,
 sha1:e6b279a9a284d131f4086839604cabe78d16161a,Amostras B/2/RGB_1_025_025_v2b.avi,ok,pendente,,,,
@@ -125,7 +125,7 @@ sha1:cc0f979d2b98033db717aea92753aec98d6ccf2b,Amostras B/3/RGB_025_1_025_v3b.avi
 sha1:0ca17ed311d2eca4eec8fdf5f7d9512dae884d8e,Amostras B/3/RGB_05_05_05_v3b.avi,ok,pendente,,,,
 sha1:9fbd11535a46b0d396a22f965d4f176c0576e014,Amostras B/3/RGB_1_025_025_v3b.avi,ok,pendente,,,,
 sha1:8a4bf052da0d32cf8c210cd1504e99056e09cd9e,Amostras B/3/RG_05_1_v3b.avi,ok,pendente,,,,
-sha1:e9dfbc35cc5f2d353838e6a14e2d40c335ec2f6f,Amostras B/3/RG_075_075_v3b.avi,fora_do_padrao,nao,erro_de_gravacao,,,"90% de quadros repetidos; dados reais só até ~11,7 s (87 quadros novos)."
+sha1:e9dfbc35cc5f2d353838e6a14e2d40c335ec2f6f,Amostras B/3/RG_075_075_v3b.avi,ok,nao,erro_de_gravacao,,,"90% de quadros repetidos; dados reais só até ~11,7 s (87 quadros novos)."
 sha1:ecb66c00ef8e975bf284cbe183266a70ad256bc3,Amostras B/3/RG_1_05_v3b.avi,ok,pendente,,,,
 sha1:80d6a1734627b34e6ddf732e3a391fdb63ebf710,Amostras B/3/R_15_v3b.avi,ok,pendente,,,,
 sha1:4105937b560ed5b2e69f2cb7f292ca3261548bd5,Amostras B/4/B_15_v4b.avi,ok,pendente,,,,
@@ -240,3 +240,4 @@ sha1:6131e52e2aebf6ba53b97f64f12b64783b2723ef,Amostras C/5/RG_05_1_v5c.avi,ok,pe
 sha1:7da95e752e151b224f3c2a58fbea2ecebe875467,Amostras C/5/RG_075_075_v5c.avi,ok,pendente,,,,
 sha1:1f2fd899efb7be55e137bbc359d8dde20e3f1b7f,Amostras C/5/RG_1_05_v5c.avi,ok,pendente,,,,
 sha1:e2c570b088f707e286d5dea1eadb7aacd1e57e5b,Amostras C/5/R_15_v5c.avi,ok,pendente,,,,
+sha1:b2302adc625c648bfcbd147a64c756bbd54fa809,PROVISORIO/Screenshots/Sample_R025G1B025.avi,fora_do_padrao,pendente,,,,
