@@ -103,6 +103,18 @@ def _cmd_graficos(args, cfg):
 
     return rodar(cfg, pasta_modelagem=args.modelagem, pasta_pos=args.pos, saida=args.saida)
 
+def _cmd_deriva(args, cfg):
+    from .deriva import rodar
+
+    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida)
+
+
+def _cmd_colinearidade(args, cfg):
+    from .colinearidade import rodar
+
+    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida)
+
+
 def _cmd_tudo(args, cfg):
     from .tudo import rodar
 
@@ -208,6 +220,16 @@ def main(argv=None) -> int:
     p.add_argument("--consolidacao", help="pasta da consolidação (padrão: output/consolidacao)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/offset)")
     p.set_defaults(func=_cmd_offset)
+
+    p = sub.add_parser("deriva", parents=[comum], help="Q4/B5. Deriva de sessão A/B/C por proporção, canal e grandeza (só análise; lê output/tabela)")
+    p.add_argument("--tabela", help="pasta com dataset.csv e descritores.csv (padrão: output/tabela)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/deriva)")
+    p.set_defaults(func=_cmd_deriva)
+
+    p = sub.add_parser("colinearidade", parents=[comum], help="Q4/B13. Correlação, VIF, agrupamento e dimensões efetivas das colunas de entrada (só análise)")
+    p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e os dicionários (padrão: output/tabela)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade)")
+    p.set_defaults(func=_cmd_colinearidade)
 
     p = sub.add_parser("tudo", parents=[comum], help="6e. Roda a cadeia consolidar -> ... -> graficos e carimba a versão nos relatórios")
     p.add_argument("--de", choices=NOMES_ETAPAS, help="primeira etapa a rodar (padrão: consolidar)")

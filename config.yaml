@@ -154,3 +154,37 @@ tudo:
     descritores: tabela/relatorio_descritores.txt
     offset: offset/relatorio_offset.txt
     graficos: graficos/graficos_resumo.txt
+
+# Q4/B5 (v0.13.0, deriva.py): deriva de sessão A/B/C. Só análise; lê output/tabela/dataset.csv e descritores.csv.
+deriva:
+  grandezas: {I0: "{c}_md_I0", t50: "{c}_md_t50", r_5s: "{c}_md_r_5s", auc_10s: "{c}_md_auc_10s", tau_cl: "{c}_cl_tau_medio", tau_c0: "{c}_c0_tau_medio"}
+  razoes: {razao_I0: "razao_I0_{par}", razao_t50: "razao_t50_{par}"}   # razões entre canais (colunas de descritores.csv)
+  pares: [R_G, G_B, R_B]
+  limiar_inicio_corr: {R: 20, G: 20, B: 20}   # regra MEDIDA de "canal com sinal" (mediana de inicio_corr da proporção, em níveis); nunca prop_*
+  min_n_por_amostra: 3        # regravações válidas exigidas em cada amostra para a célula entrar
+  alfa: 0.05                  # p de permutação (sobre eta² em log) para marcar a célula
+  eta2_minimo: 0.30           # efeito mínimo (fração da variância entre amostras) para marcar a célula; n = 5 por grupo: p sozinho engana
+  alfa_global: 0.01           # nível do teste binomial (fração de células marcadas contra alfa) e do teste da ordem monotônica
+  n_permutacoes: 5000
+  semente: 12345
+  fator_acima_do_acaso: 1.5   # d observado / d esperado sem deriva a partir do qual a diferença entre amostras conta como maior que a das regravações
+  fracao_offset_comum_minima: 0.5   # acima disto, normalizar por sessão (um fator por amostra) removeria a maior parte da deriva
+  dpi: 120
+
+# Q4/B13 (v0.13.0, colinearidade.py): colunas redundantes entre as que entradas.py permitiria. Só análise.
+colinearidade:
+  limite_r: 0.95              # par redundante: |r| (Spearman ou Pearson) acima disto
+  vif_maximo: 10.0            # poda dos conjuntos mínimos
+  vif_folgado: 30.0           # variante mais folgada dos mesmos conjuntos
+  variancia_pca: 0.95         # dimensões efetivas = componentes para esta fração da variância
+  corte_cluster: 0.05         # agrupamento hierárquico por 1-|r| (0,05 = |r| >= 0,95 no mesmo grupo)
+  fracao_nan_maxima: 0.30     # coluna mais vazia que isto sai da análise
+  min_linhas: 30
+  # colunas que descrevem o ajuste/janela (não o decaimento): entram na análise "completa", saem da "sem_diag" e dos conjuntos propostos
+  excluir_dos_conjuntos: ['_modelo$', '_ok$', '^sinal_presente_', '_r2$', '_rmse$', '_n_pontos$', '_inicio_s$', '_fim_s$']
+  preferencia: ['_tau_medio$', '_md_I0$', '_md_t50$', '_md_r_5s$', '_md_auc_10s$']   # representante preferido dentro de um grupo redundante
+  conjuntos:                  # reservatórios (padrões de nome); a poda por VIF escolhe as colunas
+    so_descritores: ['^[RGB]_md_', '^razao_']
+    so_tau: ['^[RGB]_(cl|c0)_(tau1|tau2|tau_medio|fracao_rapida|A1|A2|C)$']
+    misto: ['^[RGB]_(cl|c0)_(tau1|tau2|tau_medio|fracao_rapida|A1|A2|C)$', '^[RGB]_md_', '^razao_', '^(inicio|final)_corr_[RGB]$']
+  dpi: 120
