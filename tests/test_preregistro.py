@@ -36,7 +36,7 @@ def _montar(tmp_path):
         "avaliacao": {"semente": 1},
         "graficos": {"dpi": 100},                                    # seção SEM relação com o teste (fora de secoes_config)
         "preregistro": {"arquivo_json": str(tmp_path / "docs" / "preregistro.json"), "arquivo_md": str(tmp_path / "docs" / "preregistro.md"),
-                        "secoes_config": ["avaliacao", "preregistro"],
+                        "secoes_config": ["avaliacao", "preregistro"], "aval_orientador": "2026-11-10",
                         "declaracoes": {"variante_primaria": {"id": "teste"}, "criterio_d3": {"nivel_minimo_razao_max": 0.7}}},
     }
     caminho = tmp_path / "config.yaml"
@@ -185,3 +185,52 @@ def test_secao_listada_mas_ausente_do_config_recusa_preregistrar(tmp_path):
     with pytest.raises(ValueError, match="ausentes"):
         pr.rodar(cfg, config_path=caminho)
     assert not (tmp_path / "docs" / "preregistro.json").exists()
+
+
+# ----------------------------------------------------------------------------------------- trava do aval (v0.16.5)
+
+def test_preregistrar_recusa_sem_aval_mesmo_com_forcar(tmp_path, capsys):
+    cfg, caminho = _montar(tmp_path)
+    cfg["preregistro"]["aval_orientador"] = None
+    assert pr.rodar(cfg, config_path=caminho) == 1
+    assert pr.rodar(cfg, forcar=True, config_path=caminho) == 1
+    assert not (tmp_path / "docs" / "preregistro.json").exists() and not (tmp_path / "docs" / "preregistro.md").exists()
+    assert "aval" in capsys.readouterr().out
+
+
+def test_preregistrar_recusa_com_declaracao_provisoria(tmp_path):
+    cfg, caminho = _montar(tmp_path)
+    cfg["preregistro"]["declaracoes"]["validacao_d2"] = {"estado": "PROVISÓRIA (levar ao orientador)"}
+    assert pr.pendencias_aval(cfg) == ["preregistro.declaracoes.validacao_d2.estado ainda diz provisória: 'PROVISÓRIA (levar ao orientador)'"]
+    assert pr.rodar(cfg, forcar=True, config_path=caminho) == 1
+    assert not (tmp_path / "docs" / "preregistro.json").exists()
+
+
+def test_preregistrar_nao_mexe_no_antigo_quando_recusa(tmp_path):
+    cfg, caminho = _montar(tmp_path)
+    assert pr.rodar(cfg, config_path=caminho) == 0
+    antes = (tmp_path / "docs" / "preregistro.json").read_bytes()
+    cfg["preregistro"]["aval_orientador"] = ""
+    assert pr.rodar(cfg, forcar=True, config_path=caminho) == 1
+    assert (tmp_path / "docs" / "preregistro.json").read_bytes() == antes
+    assert not list((tmp_path / "docs").glob("preregistro_anterior_*"))
+
+
+def test_aval_aceita_data_lida_pelo_yaml_e_recusa_texto_qualquer(tmp_path):
+    from datetime import date
+    cfg, _ = _montar(tmp_path)
+    cfg["preregistro"]["aval_orientador"] = date(2026, 11, 10)
+    assert pr.pendencias_aval(cfg) == []
+    for ruim in ("sim", "10/11/2026", 1, True):
+        cfg["preregistro"]["aval_orientador"] = ruim
+        assert len(pr.pendencias_aval(cfg)) == 1
+
+
+def test_trava_do_c_fecha_se_o_aval_sair_do_config(tmp_path):
+    cfg, caminho = _montar(tmp_path)
+    assert pr.rodar(cfg, config_path=caminho) == 0
+    av.abrir_c(cfg)                                                   # com aval: abre
+    sem = copy.deepcopy(cfg)
+    sem["preregistro"]["aval_orientador"] = None
+    with pytest.raises(RuntimeError, match="aval do orientador"):
+        av.abrir_c(sem)

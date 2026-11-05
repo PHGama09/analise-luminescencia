@@ -1,6 +1,6 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.16.4; 272 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.16.5; 277 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 ## Objetivo
 
@@ -623,3 +623,6 @@ MAE médio das 3 frações, A↔B (IC 95% por preparações):
 5. O (b) com erro da média 0 na composição central pode ser inatingível: levar ao orientador como ajuste do protocolo (tolerância ou excluir essa composição de (b)). Não foi alterado nada no protocolo.
 6. D6 e D2 seguem provisórias.
 
+## Trava do aval do orientador (v0.16.5)
+
+`preregistro.aval_orientador` (padrão `null`) bloqueia o pré-registro até o aval do orientador sobre D2 e D6. Enquanto a chave não tiver uma data `AAAA-MM-DD`, ou enquanto algum texto em `preregistro.declaracoes` disser "provisória", `luminescencia preregistrar` recusa gravar (**nem com `--forcar`**) e `verificar_preregistro` mantém o C travado, mesmo que alguém volte a pôr um `docs/preregistro.json` no lugar. Destravar é um ato explícito e registrado no Git: preencher a data, trocar "provisória" por "decidida" nas declarações e rodar `luminescencia preregistrar`. O pré-registro de 04/11/2026 20:42 ficou guardado como `docs/preregistro_rascunho.json/.md` (não vale como pré-registro). `entradas.bloquear_diagnosticos: true` (E1) passou a constar no `config.yaml`, com o mesmo valor do padrão do código.

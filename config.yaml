@@ -126,6 +126,7 @@ entradas:
   limiar_inicio_corr: null    # com canais_sem_po: false, ex.: {R: 40, G: 150, B: 150}. Regra MEDIDA no vídeo; os níveis se sobrepõem (ver entradas.py)
   descritores: false          # Q3 (03/11/2026): true = acrescenta os descritores sem modelo (descritores.csv) às entradas. Nunca meta, alvo ou canal_ativo_*
   descritores_sem_nao_confiaveis_R: false   # true = tira R_md_t10, R_md_r_20s, R_md_r_40s (lista em descritores.nao_confiaveis_R); false mantém todas (Q2)
+  bloquear_diagnosticos: true # E1 (04/11/2026): diagnósticos <canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos} nunca entram
 
 descritores:
   # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.
@@ -277,6 +278,7 @@ linhas_base:
 preregistro:
   arquivo_json: docs/preregistro.json
   arquivo_md: docs/preregistro.md
+  aval_orientador: null        # v0.16.5: data do aval do orientador (AAAA-MM-DD). null = preregistrar recusa (até com --forcar) e C fica travada
   arquivos_tabela: [dataset.csv, descritores.csv, dicionario.csv, dicionario_descritores.csv]   # em <pastas.saida>/tabela
   secoes_config: [protocolo, ajuste, posprocessamento, modelagem, entradas, descritores, avaliacao, linhas_base, preregistro]
   declaracoes:

@@ -296,7 +296,7 @@ def main(argv=None) -> int:
     p.add_argument("--saida", help="pasta de saída (padrão: output/avaliacao)")
     p.set_defaults(func=_cmd_avaliar_base)
 
-    p = sub.add_parser("preregistrar", parents=[comum], help="Bloco 1. Grava docs/preregistro.json/.md (hashes, variante primária, critério D3, validação); recusa sobrescrever sem --forcar")
+    p = sub.add_parser("preregistrar", parents=[comum], help="Bloco 1. Grava docs/preregistro.json/.md (hashes, variante primária, critério D3, validação); recusa sobrescrever sem --forcar e recusa sempre sem preregistro.aval_orientador")
     p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e dicionários (padrão: output/tabela)")
     p.add_argument("--forcar", action="store_true", help="substitui um pré-registro existente (o antigo é guardado com data)")
     p.set_defaults(func=_cmd_preregistrar)

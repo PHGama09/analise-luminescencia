@@ -8,13 +8,18 @@ sensibilidades) vêm da seção `preregistro` do config.yaml: o código não esc
 Mudar qualquer item depois de abrir C invalida o teste. A verificação compara os hashes guardados no JSON com os arquivos atuais:
 arquivos da tabela e SEÇÕES do config listadas no próprio JSON (assim, mexer em seção sem relação com o teste não trava, e tirar
 uma seção da lista no config não destrava).
+
+Trava do aval (v0.16.5): enquanto `preregistro.aval_orientador` não tiver a data do aval (AAAA-MM-DD) ou alguma declaração ainda
+disser "provisória", `preregistrar` recusa gravar (nem `--forcar` passa) e `verificar_preregistro` mantém C travada. Destravar é um
+ato explícito e registrado no Git: preencher a data e trocar o estado das declarações no config.yaml.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-from datetime import datetime
+import unicodedata
+from datetime import date, datetime
 from pathlib import Path
 
 from . import __version__
@@ -27,6 +32,7 @@ PADROES = {
     "secoes_config": ["protocolo", "ajuste", "posprocessamento", "modelagem", "entradas", "descritores",
                       "avaliacao", "linhas_base", "preregistro"],
     "declaracoes": {},
+    "aval_orientador": None,          # data do aval (AAAA-MM-DD); vazio = pré-registro bloqueado e C travada
 }
 FORMATO = 1
 NOTA = "Mudar qualquer item depois de abrir C invalida o teste."
@@ -39,6 +45,35 @@ def parametros(cfg: dict) -> dict:
     if not p["arquivos_tabela"] or not p["secoes_config"]:
         raise ValueError("preregistro.arquivos_tabela e preregistro.secoes_config não podem ser vazios")
     return p
+
+
+def _sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn").lower()
+
+
+def _textos(valor, caminho=""):
+    """(caminho, texto) de todo texto dentro das declarações (dict, lista ou valor solto)."""
+    if isinstance(valor, dict):
+        for k, v in valor.items():
+            yield from _textos(v, f"{caminho}.{k}" if caminho else str(k))
+    elif isinstance(valor, (list, tuple)):
+        for i, v in enumerate(valor):
+            yield from _textos(v, f"{caminho}[{i}]")
+    elif isinstance(valor, str):
+        yield caminho, valor
+
+
+def pendencias_aval(cfg: dict) -> list[str]:
+    """O que ainda impede o pré-registro: falta a data do aval do orientador ou há declaração marcada como provisória."""
+    p = parametros(cfg)
+    pend = []
+    aval = p.get("aval_orientador")
+    if not (isinstance(aval, date) or (isinstance(aval, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", aval.strip()))):
+        pend.append("preregistro.aval_orientador está vazio (preencha com a data do aval, AAAA-MM-DD)")
+    for caminho, texto in _textos(p.get("declaracoes") or {}):
+        if "provis" in _sem_acento(texto):
+            pend.append(f"preregistro.declaracoes.{caminho} ainda diz provisória: {texto!r}")
+    return pend
 
 
 # ------------------------------------------------------------------------------------------------------------- hashes
@@ -171,6 +206,9 @@ def verificar_preregistro(cfg: dict, pasta_tabela=None, arquivo=None) -> dict:
     """Devolve o pré-registro se válido e se os hashes baterem com os arquivos atuais; senão RuntimeError listando o que diverge."""
     p = parametros(cfg)
     reg = _ler_registro(Path(arquivo or p["arquivo_json"]))
+    pend = pendencias_aval(cfg)
+    if pend:
+        raise RuntimeError("C está travada: falta o aval do orientador no config.yaml:\n  - " + "\n  - ".join(pend))
     pasta = _pasta_tabela(cfg, pasta_tabela)
     problemas = []
     for nome, esperado in reg["hashes_tabela"].items():
@@ -207,6 +245,11 @@ def _guardar_antigo(arquivo: Path, data_antiga: str) -> Path:
 
 def rodar(cfg: dict, forcar: bool = False, config_path="config.yaml", pasta_tabela=None, agora: datetime | None = None) -> int:
     p = parametros(cfg)
+    pend = pendencias_aval(cfg)
+    if pend:                                          # vale também com --forcar: destravar é editar o config, não uma flag
+        print("Recusado: o pré-registro está bloqueado até o aval do orientador (nem --forcar passa).\n  - " + "\n  - ".join(pend)
+              + "\nDepois do aval: preencha preregistro.aval_orientador, troque 'provisória' por 'decidida' nas declarações e rode de novo.")
+        return 1
     caminho_json, caminho_md = Path(p["arquivo_json"]), Path(p["arquivo_md"])
     existentes = [c for c in (caminho_json, caminho_md) if c.exists()]
     if existentes and not forcar:
