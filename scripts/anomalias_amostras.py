@@ -4,7 +4,7 @@ Uso (na raiz, venv ativo):  python scripts/anomalias_amostras.py
 Lê output/consolidacao/videos.csv, output/auditoria/relatorio_auditoria.csv, output/roi/roi.csv,
 output/tabela/dataset.csv e output/tabela/descritores.csv. Não grava nada e não altera nenhum arquivo.
 
-Seções 8 a 14 (verificação de 04/11/2026, v0.19.0): o que sobra depois da correção da luz (output/tabela/luz.csv), intensidade
+Seções 8 a 15 (verificações de 04 e 05/11/2026, v0.19.0 e v0.20.0): o que sobra depois da correção da luz (output/tabela/luz.csv), intensidade
 inicial por sessão, ausentes por sessão, escolha de modelo por sessão, duplicatas, assinatura de decaimento e ordem das regravações
 depois da correção.
 
@@ -241,6 +241,21 @@ def ordem_pos_correcao(x):
         print(f"  {col:14s} rho mediano {r.median():+.2f}, positivo em {(r > 0).sum()}/{len(r)} (p={binomtest(int((r > 0).sum()), len(r)).pvalue:.1e})")
 
 
+def ordem_razoes(ds, de):
+    print("\n== 15. Ordem das regravações nas RAZÕES de I0 (a queda do brilho se cancela entre canais?)")
+    x = de[[c for c in de.columns if c not in ("num_video", "grupo")]].merge(ds[["video", "num_video", "excluido_saturacao"]], on="video")
+    x = x[~x["excluido_saturacao"].astype(bool)].copy()
+    x["prep"] = x["proporcao"] + "|" + x["amostra"]
+    for col in ("razao_I0_R_G", "razao_I0_R_B", "razao_I0_G_B", "R_md_I0", "G_md_I0", "B_md_I0"):
+        s = x.dropna(subset=[col])
+        s = s[s[col] > 0]
+        r = pd.Series([spearmanr(g["num_video"], g[col])[0] for _, g in s.groupby("prep") if len(g) >= 4]).dropna()
+        w = np.log(s[col]) - np.log(s[col]).groupby(s["prep"]).transform("mean")
+        b = np.polyfit(s["num_video"] - s["num_video"].groupby(s["prep"]).transform("mean"), w, 1)[0]
+        print(f"  {col:13s} positivo em {(r > 0).sum()}/{len(r)} (p={binomtest(int((r > 0).sum()), len(r)).pvalue:.2f}); "
+              f"{b * 100:+.2f}% por regravação (da 1ª à 5ª: {np.expm1(4 * b) * 100:+.1f}%)")
+
+
 def main():
     v, de, x = ler()
     aquisicao(v)
@@ -258,6 +273,7 @@ def main():
     duplicatas(de)
     assinatura_decaimento(ds)
     ordem_pos_correcao(xl)
+    ordem_razoes(ds, de)
 
 
 if __name__ == "__main__":

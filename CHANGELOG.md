@@ -2,6 +2,13 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [0.20.0] — 2026-11-05
+- (Já no commit `50c206e`, sobre a v0.19.0:) o canto do preto não é mais arredondado; 25 empates x,xx5 arredondavam diferente em Windows e Linux.
+- `entradas.max_ausentes_treino` (config: 0,10): tira das entradas as colunas com ausentes demais no treino (A+B); `entradas.colunas_com_ausentes`.
+- `entradas.sem_intensidade` (config: false): tira as colunas em unidade de intensidade; `entradas.eh_intensidade`.
+- `scripts/anomalias_amostras.py`: seção 15 (razões de I0 × ordem das regravações).
+- 9 testes novos (`test_entradas_protecoes.py`). Separar vazamento e pó no vermelho: testado e rejeitado (README, item 18).
+
 ## [docs] — 2026-11-04 (verificação completa da v0.19.0)
 - `scripts/anomalias_amostras.py`: seções 8 a 14 (o que sobra depois da correção da luz, I0 por sessão, ausentes e modelos por sessão, duplicatas, assinatura de decaimento, ordem das regravações depois da correção).
 - README: itens 9 a 15 de "Anomalias entre amostras" e a pendência 3 (arredondamento do canto) no topo; guia e DECISOES atualizados.

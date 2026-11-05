@@ -132,6 +132,8 @@ entradas:
   descritores_sem_nao_confiaveis_R: false   # true = tira R_md_t10, R_md_r_20s, R_md_r_40s (lista em descritores.nao_confiaveis_R); false mantém todas (Q2)
   bloquear_diagnosticos: true # E1 (04/11/2026): diagnósticos <canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos} nunca entram
   corrigir_luz: true          # 04/11/2026 (v0.19.0, Pedro): a IA recebe as colunas de forma do decaimento corrigidas da luz de fundo (output/tabela/luz.csv, luz.py). false = valores originais. Confirmar com o orientador antes do pré-registro
+  sem_intensidade: false      # 05/11/2026 (v0.20.0): true = tira as colunas em unidade de intensidade (I0, razões de I0, inicio/final_corr, amplitudes A1/A2/C). Proteção contra excitação diferente entre sessões (I0 do R -5,2% no C); sensibilidade, desligada
+  max_ausentes_treino: 0.10   # 05/11/2026 (v0.20.0): tira das entradas as colunas com mais de 10% de ausentes no TREINO (A+B, sem saturados); null = não filtra
 
 descritores:
   # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.

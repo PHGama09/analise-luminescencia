@@ -58,11 +58,15 @@ def colunas_de_diagnostico(colunas) -> list[str]:
 
 def parametros(cfg: dict) -> dict:
     p = {"canais_sem_po": True, "limiar_inicio_corr": None, "caminhos": ["cl", "c0"],
-         "descritores": False, "descritores_sem_nao_confiaveis_R": False, "bloquear_diagnosticos": True, "corrigir_luz": False}
+         "descritores": False, "descritores_sem_nao_confiaveis_R": False, "bloquear_diagnosticos": True, "corrigir_luz": False,
+         "sem_intensidade": False, "max_ausentes_treino": None}
     p.update(cfg.get("entradas", {}) or {})
-    for chave in ("descritores", "descritores_sem_nao_confiaveis_R", "bloquear_diagnosticos", "corrigir_luz"):
+    for chave in ("descritores", "descritores_sem_nao_confiaveis_R", "bloquear_diagnosticos", "corrigir_luz", "sem_intensidade"):
         if not isinstance(p[chave], bool):
             raise ValueError(f"entradas.{chave} deve ser true ou false")
+    m = p["max_ausentes_treino"]
+    if m is not None and (isinstance(m, bool) or not isinstance(m, (int, float)) or not 0 <= m < 1):
+        raise ValueError("entradas.max_ausentes_treino deve ser null ou uma fração entre 0 e 1 (ex.: 0.10)")
     if not set(p["caminhos"]) <= set(CAMINHOS) or not p["caminhos"]:
         raise ValueError(f"entradas.caminhos deve ser subconjunto de {CAMINHOS}")
     if not p["canais_sem_po"] and not p["limiar_inicio_corr"]:
@@ -119,6 +123,30 @@ def aplicar_regra_de_sinal(df: pd.DataFrame, p: dict) -> pd.DataFrame:
     return df
 
 
+_RE_INTENSIDADE = re.compile(r"^(?:[RGB]_md_I0|razao_I0_.+|inicio_corr_[RGB]|final_corr_[RGB]|[RGB]_(?:cl|c0)_(?:A1|A2|A|C))$")
+
+
+def eh_intensidade(coluna: str) -> bool:
+    """Coluna em unidade de INTENSIDADE (nível da câmera) ou razão de intensidades: muda com a força da excitação da sessão.
+    Formas do decaimento (tau, t50, r_Ts, auc_Hs relativos a I0, fracao_rapida, razões de t50) não entram aqui."""
+    return bool(_RE_INTENSIDADE.match(coluna))
+
+
+def colunas_com_ausentes(df: pd.DataFrame, cols: list[str], cfg: dict, limite: float) -> list[str]:
+    """Colunas com fração de ausentes MAIOR que `limite` nas linhas de TREINO (divisao.treino, sem saturados). A amostra C não
+    entra na conta: quais colunas saem é decidido só com o treino."""
+    treino = [str(a) for a in ((cfg.get("divisao") or {}).get("treino") or ["A", "B"])]
+    if "amostra" not in df:
+        raise ValueError("entradas.max_ausentes_treino precisa da coluna 'amostra' no dataset")
+    m = df["amostra"].astype(str).isin(treino)
+    if "excluido_saturacao" in df:
+        m &= ~df["excluido_saturacao"].astype(bool)
+    if not m.any():
+        raise ValueError(f"nenhuma linha de treino ({', '.join(treino)}) para medir os ausentes")
+    frac = df.loc[m, cols].isna().mean()
+    return [c for c in cols if frac[c] > limite]
+
+
 def trocar_por_luz(base: pd.DataFrame, luz: pd.DataFrame) -> pd.DataFrame:
     """entradas.corrigir_luz: troca, por vídeo, as colunas que existem em luz.csv (mesmo nome) pelos valores corrigidos."""
     if not set(base["video"]) <= set(luz["video"]):
@@ -150,7 +178,14 @@ def montar_entradas(df: pd.DataFrame, dic: pd.DataFrame, cfg: dict, desc: pd.Dat
         if luz is None:
             raise ValueError("entradas.corrigir_luz: true precisa de output/tabela/luz.csv (rode 'luminescencia luz')")
         base = trocar_por_luz(base, luz)
-    return aplicar_regra_de_sinal(base, p)[cols + extra]
+    base = aplicar_regra_de_sinal(base, p)
+    todas = cols + extra
+    if p["sem_intensidade"]:                         # proteção: a força da excitação muda entre sessões (I0 do R -5,2% no C)
+        todas = [c for c in todas if not eh_intensidade(c)]
+    if p["max_ausentes_treino"] is not None:         # proteção: "coluna vazia" não pode virar pista da sessão
+        fora = set(colunas_com_ausentes(base, todas, cfg, float(p["max_ausentes_treino"])))
+        todas = [c for c in todas if c not in fora]
+    return base[todas]
 
 
 def carregar_entradas(cfg: dict, pasta_tabela=None) -> pd.DataFrame:
