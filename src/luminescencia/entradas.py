@@ -58,9 +58,9 @@ def colunas_de_diagnostico(colunas) -> list[str]:
 
 def parametros(cfg: dict) -> dict:
     p = {"canais_sem_po": True, "limiar_inicio_corr": None, "caminhos": ["cl", "c0"],
-         "descritores": False, "descritores_sem_nao_confiaveis_R": False, "bloquear_diagnosticos": True}
+         "descritores": False, "descritores_sem_nao_confiaveis_R": False, "bloquear_diagnosticos": True, "corrigir_luz": False}
     p.update(cfg.get("entradas", {}) or {})
-    for chave in ("descritores", "descritores_sem_nao_confiaveis_R", "bloquear_diagnosticos"):
+    for chave in ("descritores", "descritores_sem_nao_confiaveis_R", "bloquear_diagnosticos", "corrigir_luz"):
         if not isinstance(p[chave], bool):
             raise ValueError(f"entradas.{chave} deve ser true ou false")
     if not set(p["caminhos"]) <= set(CAMINHOS) or not p["caminhos"]:
@@ -119,9 +119,21 @@ def aplicar_regra_de_sinal(df: pd.DataFrame, p: dict) -> pd.DataFrame:
     return df
 
 
+def trocar_por_luz(base: pd.DataFrame, luz: pd.DataFrame) -> pd.DataFrame:
+    """entradas.corrigir_luz: troca, por vídeo, as colunas que existem em luz.csv (mesmo nome) pelos valores corrigidos."""
+    if not set(base["video"]) <= set(luz["video"]):
+        raise ValueError("há vídeos sem linha em luz.csv (rode 'luminescencia luz' depois de 'tabela' e 'descritores')")
+    base = base.copy()
+    lz = luz.set_index("video")
+    for col in [c for c in lz.columns if c in base.columns and c != "video"]:
+        base[col] = base["video"].map(lz[col]).to_numpy()
+    return base
+
+
 def montar_entradas(df: pd.DataFrame, dic: pd.DataFrame, cfg: dict, desc: pd.DataFrame | None = None,
-                    dic_desc: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Entradas da IA. Com entradas.descritores: true, junta (por video) as colunas de descritores sem modelo (desc, dic_desc)."""
+                    dic_desc: pd.DataFrame | None = None, luz: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Entradas da IA. Com entradas.descritores: true, junta (por video) as colunas de descritores sem modelo (desc, dic_desc).
+    Com entradas.corrigir_luz: true, as colunas de forma do decaimento vêm de luz.csv (correção da luz de fundo, luz.py)."""
     p = parametros(cfg)
     cols = [c for c in colunas_de_entrada(dic, p) if c in df.columns]
     base, extra = df, []
@@ -134,6 +146,10 @@ def montar_entradas(df: pd.DataFrame, dic: pd.DataFrame, cfg: dict, desc: pd.Dat
         if not set(df["video"]) <= set(desc["video"]):
             raise ValueError("há vídeos do dataset sem linha em descritores.csv")
         base = df.merge(desc[["video"] + extra], on="video", how="left", validate="one_to_one")
+    if p["corrigir_luz"]:
+        if luz is None:
+            raise ValueError("entradas.corrigir_luz: true precisa de output/tabela/luz.csv (rode 'luminescencia luz')")
+        base = trocar_por_luz(base, luz)
     return aplicar_regra_de_sinal(base, p)[cols + extra]
 
 
@@ -144,4 +160,5 @@ def carregar_entradas(cfg: dict, pasta_tabela=None) -> pd.DataFrame:
     desc = dic_desc = None
     if parametros(cfg)["descritores"]:
         desc, dic_desc = ler("descritores.csv"), ler("dicionario_descritores.csv")
-    return montar_entradas(ler("dataset.csv"), ler("dicionario.csv"), cfg, desc, dic_desc)
+    luz = ler("luz.csv") if parametros(cfg)["corrigir_luz"] else None
+    return montar_entradas(ler("dataset.csv"), ler("dicionario.csv"), cfg, desc, dic_desc, luz)

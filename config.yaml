@@ -131,6 +131,7 @@ entradas:
   descritores: false          # Q3 (03/11/2026): true = acrescenta os descritores sem modelo (descritores.csv) às entradas. Nunca meta, alvo ou canal_ativo_*
   descritores_sem_nao_confiaveis_R: false   # true = tira R_md_t10, R_md_r_20s, R_md_r_40s (lista em descritores.nao_confiaveis_R); false mantém todas (Q2)
   bloquear_diagnosticos: true # E1 (04/11/2026): diagnósticos <canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos} nunca entram
+  corrigir_luz: false         # 04/11/2026 (v0.18.0): true = colunas de forma do decaimento corrigidas da luz de fundo (output/tabela/luz.csv, luz.py). Decidir ANTES do pré-registro
 
 descritores:
   # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.
@@ -140,6 +141,15 @@ descritores:
   suavizacao_pontos: 5            # mediana móvel só para achar cruzamentos e ler valores em tempos fixos
   k_ruido_nivel: 3.0              # nível-alvo precisa passar de k x ruído do canal para o cruzamento valer
   nao_confiaveis_R: [t10, r_20s, r_40s]   # Q2 (03/11/2026): só AVISO no dicionario_descritores.csv (no R o sinal chega ao ruído); a coluna continua na tabela
+
+
+luz:
+  # Correção da luz de fundo (luz.py, v0.18.0, decisão de 04/11/2026). Inclinações só em divisao.treino, dentro das preparações, sem saturados.
+  # Colunas PARALELAS em output/tabela/luz.csv (mesmo nome); entradas.corrigir_luz liga. Não corrige I0 nem razões de I0.
+  grandezas_canal: [c0_tau_medio, cl_tau_medio, md_t50, md_t10, md_r_2s, md_r_5s, md_r_10s, md_r_20s, md_r_40s, md_auc_10s, md_auc_30s]
+  razoes: [razao_t50_R_G, razao_t50_G_B, razao_t50_R_B]
+  min_videos: 30              # menos vídeos de calibração que isto: inclinação não estimada (b = 0, coluna copiada)
+  min_preparacoes: 5
 
 offset:
   # P5 (03/11/2026, offset.py): teste do offset cantos - ROI. Só análise.
@@ -157,6 +167,7 @@ tudo:
     tabela: tabela/relatorio_tabela.txt
     comparar_modelos: modelagem/relatorio_comparacao_modelos.txt
     descritores: tabela/relatorio_descritores.txt
+    luz: luz/relatorio_luz.txt
     offset: offset/relatorio_offset.txt
     graficos: graficos/graficos_resumo.txt
 
@@ -283,8 +294,8 @@ preregistro:
   arquivo_json: docs/preregistro.json
   arquivo_md: docs/preregistro.md
   aval_orientador: null        # v0.16.5: data do aval do orientador (AAAA-MM-DD). null = preregistrar recusa (até com --forcar) e C fica travada
-  arquivos_tabela: [dataset.csv, descritores.csv, dicionario.csv, dicionario_descritores.csv]   # em <pastas.saida>/tabela
-  secoes_config: [protocolo, ajuste, posprocessamento, modelagem, entradas, descritores, avaliacao, linhas_base, preregistro]
+  arquivos_tabela: [dataset.csv, descritores.csv, dicionario.csv, dicionario_descritores.csv, luz.csv]   # em <pastas.saida>/tabela
+  secoes_config: [protocolo, ajuste, posprocessamento, consolidacao, modelagem, entradas, descritores, luz, avaliacao, linhas_base, preregistro]
   declaracoes:
     variante_primaria:
       id: c0_descritores

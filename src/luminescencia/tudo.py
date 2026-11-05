@@ -33,9 +33,10 @@ ETAPAS = {
     "comparar_modelos": ("comparacao_modelos", "modelagem/relatorio_comparacao_modelos.txt"),
     "descritores": ("descritores", "tabela/relatorio_descritores.txt"),
     "offset": ("offset", "offset/relatorio_offset.txt"),
+    "luz": ("luz", "luz/relatorio_luz.txt"),
     "graficos": ("graficos", "graficos/graficos_resumo.txt"),
 }
-CADEIA_PADRAO = ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "graficos"]
+CADEIA_PADRAO = ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "luz", "graficos"]
 NOMES_ETAPAS = CADEIA_PADRAO[:6] + ["offset"] + CADEIA_PADRAO[6:]
 
 
@@ -161,7 +162,7 @@ def _rodar_cadeia(cfg, de=None, ate=None, com_offset=False, parar_no_erro=True, 
 ARQ_REFERENCIA = Path("tests") / "referencia" / "referencia.json"
 REL_REGRESSAO = Path("regressao") / "relatorio_regressao.txt"
 CSVS_REFERENCIA = ["tabela/dataset.csv", "tabela/descritores.csv", "modelagem/ajustes.csv",
-                   "modelagem/comparacao_modelos.csv"]
+                   "modelagem/comparacao_modelos.csv", "tabela/luz.csv"]
 STATS = ("mediana", "media", "nan")
 RTOL_PADRAO, ATOL_PADRAO = 1e-3, 1e-9
 # Números extraídos dos relatórios .txt por regex: etapa -> [(chave, padrão)]. Padrão que não casa só gera aviso.

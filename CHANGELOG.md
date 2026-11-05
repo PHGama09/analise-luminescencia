@@ -2,6 +2,12 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [0.18.0] — 2026-11-04
+- Etapa nova `luminescencia luz` (`luz.py`): correção da luz de fundo em colunas paralelas (`output/tabela/luz.csv`), com inclinações calibradas só em A+B, dentro das preparações e sem saturados; validação cruzada A↔B em `output/luz/`. Entra no `tudo` depois de `descritores` e na conferência de regressão.
+- `entradas.corrigir_luz` (padrão false) troca as colunas de forma do decaimento pelas corrigidas; `entradas.trocar_por_luz`.
+- Pré-registro: `luz.csv` em `arquivos_tabela`; seções `consolidacao` e `luz` em `secoes_config`.
+- 10 testes novos (`test_luz.py`); `test_tudo.py` com a cadeia nova.
+
 ## [0.17.0] — 2026-11-04
 - `consolidacao.canto_sem_piso` (padrão no config: true): o preto usa o canto real, relido dos CSVs por vídeo, sem o `max` com `extracao.piso_minimo`. Três travas (`canto_min_quadros`, `canto_max_variacao`, `canto_minimo_absoluto`); colunas novas `piso_canto_extracao_*` e `canto_fonte_*` em `videos.csv`. Muda 53 vídeos no B; a referência de regressão precisa ser regravada.
 - 6 testes novos em `test_consolidacao.py`; tolerância de `test_integracao.py::test_preto_por_video_recuperado` de 0,01 para 0,02 (o canto agora vem dos quadros com ruído).

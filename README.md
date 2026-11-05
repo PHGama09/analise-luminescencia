@@ -1,10 +1,10 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.17.0; 283 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). Também estão feitos o lote Q4 (análises de controle), os blocos 1 e 2 (avaliação sem IA, qualidade, simulação do IC) e a trava do aval do orientador. **Ainda faltam** (não feitos, por decisão): treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.18.0; 293 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). Também estão feitos o lote Q4 (análises de controle), os blocos 1 e 2 (avaliação sem IA, qualidade, simulação do IC) e a trava do aval do orientador. **Ainda faltam** (não feitos, por decisão): treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 > ⚠️ **Pendências que precisam ser resolvidas ANTES de qualquer treino** (detalhes em "Anomalias entre amostras"):
 > 1. **`RB_05_1_v1a` (amostra A, treino) parece ser de outra composição (`RG_05_1`).** Assistir ao vídeo e decidir no `curadoria.csv` (`incluir = nao` ou nome corrigido em `nome_aprovado`). Enquanto isso, ele **entra no dataset com um rótulo provavelmente errado**, porque está como `pendente` com auditoria `ok`.
-> 2. **Luz de fundo durante a gravação:** é o maior artefato conhecido da medição. Falta decidir se haverá correção (estatística, calibrada só em A+B) ou só declaração.
+> 2. **Luz de fundo durante a gravação:** é o maior artefato conhecido da medição. A correção estatística já existe (`luminescencia luz`, v0.18.0), mas está **desligada** (`entradas.corrigir_luz: false`). Falta decidir se o treino usa as colunas corrigidas, antes do pré-registro e de preferência com o orientador. O teste de luz acesa × apagada, que confirmaria a causa, continua pendente.
 
 > **Novo no projeto?** Comece por [`docs/GUIA_DO_PROJETO.md`](docs/GUIA_DO_PROJETO.md): explica em linguagem simples o que é o projeto, o glossário, o fluxo de trabalho e o porquê de cada funcionalidade. As decisões, com data, estão em [`docs/DECISOES.md`](docs/DECISOES.md).
 
@@ -22,7 +22,7 @@ O trabalho tem quatro fases. Cada etapa lê a saída da anterior e grava seus re
 
 ```
 Fase 1 (vídeos, lenta)   auditar → roi → extrair
-Fase 2 (dados, `tudo`)   consolidar → pos → modelar → tabela → comparar_modelos → descritores → graficos
+Fase 2 (dados, `tudo`)   consolidar → pos → modelar → tabela → comparar_modelos → descritores → luz → graficos
 Fase 3 (só análise)      offset · deriva · colinearidade · qualidade · janela_r · saturados · ic_simulacao
 Fase 4 (avaliação, sem IA)  entradas.py → avaliacao.py → avaliar_base → preregistrar (bloqueado até o aval) → C, uma vez, no fim
 ```
@@ -328,6 +328,7 @@ luminescencia comparar_modelos   # 6c. Compara simples, dupla, esticada e potên
 luminescencia descritores        # 6d. Descritores sem modelo (t50, t10, razões, área): tabela paralela ao dataset
 luminescencia graficos           # 7. Gráficos (semilog, tau cl x c0, resíduos, normalizada, log-log, ln I x t, 1/I x t)
 luminescencia offset             # P5. Testa a suposição do preto por vídeo (offset cantos - ROI); só análise
+luminescencia luz                # Correção da luz de fundo: colunas paralelas em output/tabela/luz.csv (só com entradas.corrigir_luz: true)
 luminescencia tudo --conferir    # 6e. Cadeia consolidar ... graficos, carimbo e conferência de regressão (--so-conferir só confere)
 luminescencia deriva             # Q4/B5. Deriva de sessão A/B/C (só análise)
 luminescencia colinearidade --so-treino   # Q4/B13. Colunas redundantes, só A+B (use esta versão para escolher colunas)
@@ -364,6 +365,7 @@ analise-luminescencia/
 │   ├── consolidacao.py      # etapa 4
 │   ├── posprocessamento.py  # etapa 5
 │   ├── config.py            # leitura do config.yaml
+│   ├── luz.py               # correção da luz de fundo (colunas paralelas, calibrada só em A+B; v0.18.0)
 │   ├── deriva.py            # Q4/B5: deriva de sessão A/B/C (só análise)
 │   ├── colinearidade.py     # Q4/B13: redundância das colunas de entrada (só análise)
 │   ├── janela_r.py          # Q4/B12: fim de janela do R (só análise)
@@ -478,13 +480,30 @@ Hipótese (não testada): luz ambiente durante a gravação, refletida pelo pó 
 
 **O que decidir (nada foi aplicado):**
 1. **`RB_05_1_v1a` (PENDENTE, resolver antes de treinar):** assistir e, se for mesmo `RG_05_1`, marcar `incluir = nao` no `curadoria.csv`. Depois rodar `tudo` e regravar a referência com `--gravar-referencia`, porque o dataset muda.
-2. Luz nos cantos, que hoje é o maior artefato conhecido da medição (a opção do anel foi testada e rejeitada, item 7):
+2. Luz nos cantos, que hoje é o maior artefato conhecido da medição (a opção do anel foi testada e rejeitada, item 7; **a correção estatística, opção (b), foi implementada na v0.18.0**: ver "Correção da luz de fundo" abaixo):
    - (a) na gravação: escurecer o ambiente e gravar um vídeo de controle por sessão (já sugerido na P5);
    - (b) na análise: uma correção calibrada **só em A+B**, igual para todos e decidida antes de abrir o C;
    - (c) no mínimo, declarar o artefato e usar o canto como controle de qualidade (nunca como entrada).
 3. ~~Piso mínimo~~: **aplicado na v0.17.0** (item 4). Falta só regravar a referência de regressão.
 4. Declarar no protocolo que as regravações têm tendência com a ordem e que parte da "deriva de sessão" é luz de fundo.
 
+
+#### Correção da luz de fundo (`luminescencia luz`, `luz.py`, v0.18.0)
+
+**O que faz.** Para cada grandeza de **forma** do decaimento, estima quanto ela muda por nível de luz nos cantos e grava uma versão corrigida. As grandezas são τ (`c0` e `cl`), `t50`, `t10`, `r_Ts`, `auc_Hs` e as razões de `t50` entre canais. O I0 e as razões de I0 não mudam com a luz e ficam fora.
+- **Correção:** `x_luz = x · exp(−b · (canto − canto_ref))`, onde canto = média de `piso_canto_R/G/B` (o canto real, desde a v0.17.0).
+- **Calibração:** `b` é estimado **dentro das preparações** (tira composição e sessão), **só em `divisao.treino` (A+B)** e sem os saturados. `canto_ref` = mediana do canto na calibração (2,378). **O C nunca entra na calibração**: só recebe a mesma correção.
+- **Saídas:** `output/tabela/luz.csv` traz as colunas corrigidas **com o mesmo nome** das originais. `dataset.csv` e `descritores.csv` não mudam. Relatórios em `output/luz/`: `inclinacoes.csv`, `validacao_cruzada.csv` e `relatorio_luz.txt`.
+- **Uso:** `entradas.corrigir_luz: true` troca as 33 colunas nas entradas da IA (padrão: `false`). O nível de luz (`canto_luz`) **nunca** vira entrada, porque identificaria a sessão.
+- A etapa roda dentro do `tudo` (depois de `descritores`). `luz.csv` entra na conferência de regressão e no pré-registro, junto com as seções `luz` e `consolidacao` do config.
+
+**Verificação (não circular).** Na própria calibração, a relação com a luz vai a zero por construção, então isso não prova nada. A verificação é uma **validação cruzada A↔B**: a inclinação é estimada numa amostra e aplicada na outra. A dispersão entre regravações caiu em **71 de 72** testes (queda mediana de 10%; por canal: R 13%, G 13%, B 5%; nas razões, 1%). A correlação canto × grandeza na amostra de teste caiu de |ρ| 0,57 para 0,09 (medianas). O único teste que piorou foi `razao_t50_R_B` (A→B), de 7,8% para 7,9%.
+
+**Inclinações (exemplos; todas em `relatorio_luz.txt`):** τ `c0` R +5,2%, G +4,5%, B +5,1% por nível; `t50` R +3,3%, G +1,4%, B +2,1%; `auc_10s` R +2,4%, G +0,6%, B +1,0%.
+
+**Limite conhecido: o vermelho fica subcorrigido.** Pela regra do projeto, a calibração usa o sinal **medido** (`sinal_presente_*`), nunca a proporção. Por isso ela inclui os 42 vídeos de A+B em que o vermelho só aparece por vazamento de cor. Neles, a luz quase não muda o decaimento (τ −2,2%, `t50` −0,2% por nível), enquanto nos vídeos com o pó vermelho a inclinação é +8,5% (τ) e +4,8% (`t50`). A mistura dá +5,2% e +3,3%. No verde e no azul, as duas populações se comportam igual. Separar as duas exigiria usar a proporção ou uma regra medida nova; ficou como está, de propósito. (Números da verificação de 04/11/2026; o `luz.py` não os calcula, para não usar `prop_*`.)
+
+**Outros limites:** a correção é empírica (a causa física não foi confirmada), supõe efeito linear e igual entre composições e não remove toda a diferença entre sessões. **A decisão "com" ou "sem" correção precisa ser tomada antes do pré-registro.** Treinar com as duas versões e comparar só em A↔B é uma sensibilidade válida.
 ### Q4/B12 — Fim de janela específico do R (`luminescencia janela_r`, v0.13.0)
 
 Só sensibilidade: reajusta os 227 sinais do R (C livre com C ≥ −1,35 e C = 0, mesmo critério simples/dupla do `modelar`, início em 2,5 s) com outras regras de fim de janela. **Nenhum número de `dataset.csv`/`descritores.csv` mudou e o padrão (`modelagem.ruido_k` = 3) não foi alterado.** Saída em `output/janela_r/` (`resumo_regras.csv`, `sinais.csv`, `relatorio_janela_r.txt`). Seção `janela_r` do `config.yaml`.

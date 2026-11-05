@@ -5,7 +5,7 @@ import pytest
 
 from luminescencia import __version__, cli, tudo
 
-ORDEM = ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "graficos"]
+ORDEM = ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "luz", "graficos"]
 
 
 @pytest.fixture
@@ -79,7 +79,7 @@ def test_cadeia_na_ordem_padrao(ambiente):
 def test_com_offset_depois_de_descritores(ambiente):
     cfg, cfg_arq, chamadas, _ = ambiente
     assert tudo.rodar(cfg, com_offset=True, config_path=cfg_arq) == 0
-    assert chamadas == ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "offset", "graficos"]
+    assert chamadas == ["consolidar", "pos", "modelar", "tabela", "comparar_modelos", "descritores", "offset", "luz", "graficos"]
 
 
 def test_de_ate(ambiente):

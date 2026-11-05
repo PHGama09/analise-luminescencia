@@ -92,6 +92,12 @@ def _cmd_descritores(args, cfg):
     return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, saida=args.saida)
 
 
+def _cmd_luz(args, cfg):
+    from .luz import rodar
+
+    return rodar(cfg, pasta_tabela=args.tabela, pasta_consolidacao=args.consolidacao, saida=args.saida)
+
+
 def _cmd_offset(args, cfg):
     from .offset import rodar
 
@@ -245,6 +251,11 @@ def main(argv=None) -> int:
     p.add_argument("--saida", help="pasta de saída (padrão: output/tabela)")
     p.set_defaults(func=_cmd_descritores)
 
+    p = sub.add_parser("luz", parents=[comum], help="Correção da luz de fundo: inclinações só em A+B, colunas paralelas em output/tabela/luz.csv e validação cruzada A<->B (entradas.corrigir_luz liga)")
+    p.add_argument("--tabela", help="pasta com dataset.csv e descritores.csv; luz.csv é gravado nela (padrão: output/tabela)")
+    p.add_argument("--consolidacao", help="pasta com videos.csv (padrão: output/consolidacao)")
+    p.add_argument("--saida", help="pasta dos relatórios (padrão: output/luz)")
+    p.set_defaults(func=_cmd_luz)
     p = sub.add_parser("graficos", parents=[comum], help="7. Gráficos: semilog com os dois ajustes, tau cl x c0, resíduos, normalizada, log-log, ln I x t, 1/I x t")
     p.add_argument("--modelagem", help="pasta da modelagem (padrão: output/modelagem)")
     p.add_argument("--pos", help="pasta do pós-processamento (padrão: output/posprocessamento)")
