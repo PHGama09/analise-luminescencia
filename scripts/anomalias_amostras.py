@@ -4,7 +4,7 @@ Uso (na raiz, venv ativo):  python scripts/anomalias_amostras.py
 Lê output/consolidacao/videos.csv, output/auditoria/relatorio_auditoria.csv, output/roi/roi.csv,
 output/tabela/dataset.csv e output/tabela/descritores.csv. Não grava nada e não altera nenhum arquivo.
 
-Seções 8 a 17 (verificações de 04 e 05/11/2026, v0.19.0 e v0.20.0): o que sobra depois da correção da luz (output/tabela/luz.csv), intensidade
+Seções 8 a 14 (verificação de 04/11/2026, v0.19.0): o que sobra depois da correção da luz (output/tabela/luz.csv), intensidade
 inicial por sessão, ausentes por sessão, escolha de modelo por sessão, duplicatas, assinatura de decaimento e ordem das regravações
 depois da correção.
 
@@ -241,64 +241,6 @@ def ordem_pos_correcao(x):
         print(f"  {col:14s} rho mediano {r.median():+.2f}, positivo em {(r > 0).sum()}/{len(r)} (p={binomtest(int((r > 0).sum()), len(r)).pvalue:.1e})")
 
 
-def ordem_razoes(ds, de):
-    print("\n== 15. Ordem das regravações nas RAZÕES de I0 (a queda do brilho se cancela entre canais?)")
-    x = de[[c for c in de.columns if c not in ("num_video", "grupo")]].merge(ds[["video", "num_video", "excluido_saturacao"]], on="video")
-    x = x[~x["excluido_saturacao"].astype(bool)].copy()
-    x["prep"] = x["proporcao"] + "|" + x["amostra"]
-    for col in ("razao_I0_R_G", "razao_I0_R_B", "razao_I0_G_B", "R_md_I0", "G_md_I0", "B_md_I0"):
-        s = x.dropna(subset=[col])
-        s = s[s[col] > 0]
-        r = pd.Series([spearmanr(g["num_video"], g[col])[0] for _, g in s.groupby("prep") if len(g) >= 4]).dropna()
-        w = np.log(s[col]) - np.log(s[col]).groupby(s["prep"]).transform("mean")
-        b = np.polyfit(s["num_video"] - s["num_video"].groupby(s["prep"]).transform("mean"), w, 1)[0]
-        print(f"  {col:13s} positivo em {(r > 0).sum()}/{len(r)} (p={binomtest(int((r > 0).sum()), len(r)).pvalue:.2f}); "
-              f"{b * 100:+.2f}% por regravação (da 1ª à 5ª: {np.expm1(4 * b) * 100:+.1f}%)")
-
-
-def sessao_nas_entradas(ds):
-    print("\n== 16. Quanto as ENTRADAS finais ainda diferenciam as sessões (A x B, dentro da composição; só treino)")
-    print("  fração da variação dentro da composição que é diferença entre A e B (0 = nenhuma; 1 = só sessão).")
-    print("  Sessão e preparação estão confundidas (cada amostra é uma preparação gravada numa sessão): isto mede as duas juntas.")
-    import yaml
-
-    from luminescencia import entradas as en
-    cfg = yaml.safe_load(open("config.yaml", encoding="utf-8"))
-    cfg["entradas"]["descritores"] = True
-    ent = en.carregar_entradas(cfg)
-    ent["amostra"] = ds["amostra"].to_numpy()
-    ent["proporcao"] = ds["proporcao"].to_numpy()
-    ent = ent[(~ds["excluido_saturacao"].astype(bool)).to_numpy() & ds["amostra"].isin(["A", "B"]).to_numpy()]
-    ent = ent[ent.groupby("proporcao")["amostra"].transform("nunique") == 2]
-    linhas = []
-    for col in [c for c in ent.columns if c not in ("amostra", "proporcao") and ent[c].dtype.kind == "f"]:
-        t = ent[["amostra", "proporcao", col]].dropna()
-        if t[col].nunique() < 5:
-            continue
-        m_comp = t[col].groupby(t["proporcao"]).transform("mean")
-        m_prep = t[col].groupby(t["proporcao"] + "|" + t["amostra"]).transform("mean")
-        tot = float(((t[col] - m_comp) ** 2).sum())
-        if tot > 0:
-            linhas.append((col, float(((m_prep - m_comp) ** 2).sum()) / tot))
-    r = pd.DataFrame(linhas, columns=["coluna", "fracao_sessao"]).sort_values("fracao_sessao", ascending=False)
-    print(f"  {len(r)} colunas; mediana {r['fracao_sessao'].median():.2f}; acima de 0,5: {int((r['fracao_sessao'] > 0.5).sum())}")
-    print("  as 8 maiores:", [(c, round(v, 2)) for c, v in r.head(8).values])
-    d4 = r[r["coluna"].str.contains("md_t50|md_r_5s|md_auc_10s|razao_")]
-    print("  colunas da D4 (t50, r_5s, auc_10s, razões):", [(c, round(v, 2)) for c, v in d4.values])
-    sem = r[~r["coluna"].map(en.eh_intensidade)]
-    print(f"  sem as colunas de intensidade (entradas.sem_intensidade): mediana {sem['fracao_sessao'].median():.2f}; "
-          f"acima de 0,5: {int((sem['fracao_sessao'] > 0.5).sum())}")
-
-
-def cobertura(ds):
-    print("\n== 17. Cobertura: vídeos utilizáveis (sem saturados) por composição e amostra")
-    u = ds[~ds["excluido_saturacao"].astype(bool)]
-    tab = pd.crosstab(u["proporcao"], u["amostra"]).reindex(columns=list("ABC"), fill_value=0)
-    print("  composições sem alguma amostra:", {p: [a for a in "ABC" if tab.loc[p, a] == 0] for p in tab.index if (tab.loc[p] == 0).any()})
-    print("  composições com menos de 5 vídeos em alguma amostra:", {p: tab.loc[p].to_dict() for p in tab.index if (tab.loc[p] < 5).any()})
-    print("  saturados por composição e amostra:", ds[ds["excluido_saturacao"].astype(bool)].groupby(["proporcao", "amostra"]).size().to_dict())
-
-
 def main():
     v, de, x = ler()
     aquisicao(v)
@@ -316,9 +258,6 @@ def main():
     duplicatas(de)
     assinatura_decaimento(ds)
     ordem_pos_correcao(xl)
-    ordem_razoes(ds, de)
-    sessao_nas_entradas(ds)
-    cobertura(ds)
 
 
 if __name__ == "__main__":

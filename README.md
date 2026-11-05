@@ -1,14 +1,12 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.20.0; 305 testes; análise final em 05/11/2026).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). Também estão feitos o lote Q4 (análises de controle), os blocos 1 e 2 (avaliação sem IA, qualidade, simulação do IC) e a trava do aval do orientador. **Ainda faltam** (não feitos, por decisão): treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.19.0; 295 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). Também estão feitos o lote Q4 (análises de controle), os blocos 1 e 2 (avaliação sem IA, qualidade, simulação do IC) e a trava do aval do orientador. **Ainda faltam** (não feitos, por decisão): treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 > ⚠️ **Pendências que precisam ser resolvidas ANTES de qualquer treino** (detalhes em "Anomalias entre amostras"):
 > 1. **`RB_05_1_v1a` (amostra A, treino) parece ser de outra composição (`RG_05_1`).** Assistir ao vídeo e decidir no `curadoria.csv` (`incluir = nao` ou nome corrigido em `nome_aprovado`). Enquanto isso, ele **entra no dataset com um rótulo provavelmente errado**, porque está como `pendente` com auditoria `ok`.
 > 2. **Luz de fundo durante a gravação:** é o maior artefato conhecido da medição. A correção estatística (`luminescencia luz`) foi **ligada** na v0.19.0 (`entradas.corrigir_luz: true`, decisão do Pedro de 04/11/2026) porque, só em A↔B, aumenta a separação entre composições em 36 de 36 colunas. **Falta a confirmação do orientador antes do pré-registro.** O teste de luz acesa × apagada, que confirmaria a causa, continua pendente.
 
-> 3. **Reprodutibilidade entre máquinas (achado de 04/11/2026, correção proposta):** o canto do preto é arredondado a 2 casas e, em 25 cantos, a mediana cai exatamente em x,xx5. O arredondamento desses empates muda de máquina para máquina, e por isso a conferência de regressão dá 1 divergência no Windows contra a referência gravada no Linux. **Resolvido no commit `50c206e` (05/11/2026):** o canto não é mais arredondado (`consolidacao.canto_do_video`), e o resultado é o mesmo em qualquer máquina. A referência foi regravada no mesmo commit.
-
-> **O que não se resolve em código:** a lista completa, com o que resolveria cada item, está em "Limites que não se resolvem em código", logo abaixo de "Objetivo", e na seção 9 do guia.
+> 3. **Reprodutibilidade entre máquinas (achado de 04/11/2026, correção proposta):** o canto do preto é arredondado a 2 casas e, em 25 cantos, a mediana cai exatamente em x,xx5. O arredondamento desses empates muda de máquina para máquina, e por isso a conferência de regressão dá 1 divergência no Windows contra a referência gravada no Linux. A correção (não arredondar o canto) está em `propostas/01_canto_sem_arredondamento.diff` e espera aprovação. Depois de aplicar, é preciso regravar a referência.
 
 > **Novo no projeto?** Comece por [`docs/GUIA_DO_PROJETO.md`](docs/GUIA_DO_PROJETO.md): explica em linguagem simples o que é o projeto, o glossário, o fluxo de trabalho e o porquê de cada funcionalidade. As decisões, com data, estão em [`docs/DECISOES.md`](docs/DECISOES.md).
 
@@ -19,31 +17,6 @@ Transformar vídeos de amostras luminescentes em **dados numéricos limpos e com
 Os dados serão usados para **treinar um modelo de IA**. Por isso a prioridade do projeto não é só extrair números, e sim garantir que **todas as amostras sejam medidas do mesmo jeito**. Qualquer diferença sistemática entre grupos de vídeos (outro fps, outra exposição, outra distância da câmera) pode ser aprendida pelo modelo no lugar da diferença real entre as amostras.
 
 **O que são as amostras:** pós luminescentes em proporções diferentes de três componentes, identificados por amostra (A/B/C) e número do vídeo (1 a 5). O protocolo grava a fase de excitação e depois o decaimento (luz de excitação apagada logo no início, entre 0,2 e 0,4 s de vídeo), em arquivos de 15 fps (cerca de 8 quadros novos por segundo reais, pois ~47% dos quadros se repetem).
-
-
-## Limites que não se resolvem em código (análise final de 05/11/2026)
-
-Estes problemas estão nos **dados** ou no **desenho da coleta**, não no código. O código já mede, mitiga ou protege o que dá; o resto precisa de uma decisão, de uma gravação nova ou de ser declarado ao ler o resultado. Nenhum deles pode ser "corrigido" olhando o C, porque isso estragaria a prova cega. Números em `scripts/anomalias_amostras.py`.
-
-| # | Problema | Por que o código não resolve | O que resolveria | O que fazer agora |
-|---|---|---|---|---|
-| 1 | **`RB_05_1_v1a` parece ser de outra composição** (cor e decaimento de `RG_05_1`) | O código não sabe o que foi gravado; só mostra que não bate | Assistir ao vídeo (ou lembrar da gravação) | Decidir na curadoria **antes de treinar** |
-| 2 | **Luz de fundo durante a gravação**, o maior artefato conhecido | A causa física não foi confirmada; a correção estatística reduz o efeito (separação +22%), mas não o elimina | Gravar no escuro, com um vídeo de controle por sessão | Fazer o teste de luz acesa × apagada; declarar |
-| 3 | **Correção da luz mais fraca no C** (ρ residual R +0,46) | Ajustar olhando o C seria usar a prova | Uma causa física confirmada (item 2) | Declarar ao ler o resultado em C |
-| 4 | **Excitação mais fraca no vermelho no C** (I0 −5,2%; razão R/G −2,8%) | Medir a diferença exige olhar o C | Controlar a excitação (lâmpada, tempo) em cada gravação | Declarar: "a IA pode ver menos vermelho no C"; `sem_intensidade` como sensibilidade |
-| 5 | **Sessão e preparação confundidas**: cada amostra é uma preparação gravada numa sessão | Não há como separar o efeito do preparo do efeito da sessão com estes dados; as entradas ainda carregam diferença A×B (mediana 32% da variação dentro da composição) | Outro desenho: várias preparações por sessão, ou a mesma preparação em várias sessões | Declarar; é o que o teste em C mede |
-| 6 | **Só 1 preparação de validação por composição** (D6) | Dados, não código: o intervalo de confiança do erro em C fica largo | Uma 2ª preparação (`docs/plano_segunda_preparacao.md`) | Aguardar o orientador |
-| 7 | **`G0.5_B1` sem amostra A no treino** (os 5 vídeos saturaram) | Saturação é medida perdida | Regravar com menos exposição | O treino dessa composição usa só os 5 vídeos de B |
-| 8 | **9 vídeos saturados** fora do treino e da validação | A parte saturada da curva não existe nos dados | Regravar com menos exposição | Rever depois (D5) |
-| 9 | **O vazamento de cor domina o canal vermelho** (explica em mediana 60% do sinal mesmo com pó vermelho) | Limitação da câmera RGB: os canais não são cores puras | Outra câmera ou filtros ópticos | Declarar: o R é o canal mais difícil |
-| 10 | **O brilho cai ao longo das regravações** (R −3,6%, G −2,0% da 1ª à 5ª) | A causa (fadiga do pó, aquecimento da lâmpada) é desconhecida; usar a ordem como correção não funciona num vídeo novo | Descobrir a causa e controlá-la | Nada: se cancela nas razões entre canais |
-| 11 | **Suposição do controle**: a diferença canto/ROI é a mesma em todas as sessões | Há um único vídeo de controle | Um vídeo de controle por sessão | Mitigado pelo `offset`; declarar |
-| 12 | **`R1.5` sem sinal em G e B** | Ausência física, não falta de dado | — | Nunca preencher com a proporção |
-| 13 | **Poucos dados**: cerca de 29 preparações no treino A+B | Nenhum código cria preparações | Mais preparações | Preferir modelos simples; sensibilidades em A↔B |
-| 14 | **Decisões provisórias**: D2, D6 e a correção da luz aguardam o orientador | São decisões de método | A reunião com o orientador | Depois do aval: preencher `preregistro.aval_orientador` e rodar `preregistrar` |
-| 15 | **`C/1/RGB_05_05_05_v1a` pendente** (`R0.5_G0.5_B0.5` fica com 4 vídeos no C) | É uma decisão de curadoria | Decidir (D-pipeline 6: "só no fim") | Decidir antes de abrir o C |
-
-**O que ainda dá para fazer em código (pequeno, opcional):** transformar a checagem de assinatura de cor (seção 6 do script) num alerta automático da consolidação, para pegar casos como o `RB_05_1_v1a` em vídeos futuros; e confirmar `entradas.descritores` contra a variante declarada no pré-registro antes de treinar (uma linha do config).
 
 ## Visão geral
 
@@ -533,33 +506,9 @@ Hipótese (não testada): luz ambiente durante a gravação, refletida pelo pó 
 - **Ausentes por sessão:** 5 colunas têm fração de ausentes diferente em mais de 5 p.p. entre amostras (por exemplo, `R_md_r_20s` 1%/5%/10% e `G_md_t10` 14%/15%/8%). Isso segue a física (o sinal some antes no C), mas a **presença ou ausência** dessas colunas pode identificar a sessão. As colunas prioritárias da D4 (`t50`, `r_5s`, `auc_10s`) não têm esse problema.
 - **Assinatura de decaimento:** 10 vídeos têm o padrão de `t50` mais perto de outra composição, mas esse sinal é fraco (composições com `t50` parecidos se confundem). O único caso que coincide com a assinatura de cor é o `RB_05_1_v1a`, o que reforça a pendência 1.
 
-**14. Reprodutibilidade entre máquinas (correção proposta).** Desde a v0.17.0, o canto é recalculado em cada máquina e arredondado a 2 casas. Em 25 cantos a mediana cai exatamente em x,xx5 e o empate é decidido pela representação binária, que muda com a versão do pandas. Resultado: 25 cantos diferem 0,01 entre o Windows do Pedro e o Linux da verificação, a conferência acusa 1 divergência (`final_corr_R`, 0,15%), e em `RB_075_075_v5b` o fim da janela do R muda 0,8 s. A proposta é não arredondar o canto. O preto muda no máximo 0,009 nível (mediana 0,003), e os 2 ajustes do B que tinham trocado de modelo na v0.17.0 voltam ao modelo de antes, o que mostra que estavam no limite. **Aplicado no commit `50c206e`**, com a referência regravada.
+**14. Reprodutibilidade entre máquinas (correção proposta).** Desde a v0.17.0, o canto é recalculado em cada máquina e arredondado a 2 casas. Em 25 cantos a mediana cai exatamente em x,xx5 e o empate é decidido pela representação binária, que muda com a versão do pandas. Resultado: 25 cantos diferem 0,01 entre o Windows do Pedro e o Linux da verificação, a conferência acusa 1 divergência (`final_corr_R`, 0,15%), e em `RB_075_075_v5b` o fim da janela do R muda 0,8 s. A proposta é não arredondar o canto. O preto muda no máximo 0,009 nível (mediana 0,003), e os 2 ajustes do B que tinham trocado de modelo na v0.17.0 voltam ao modelo de antes, o que mostra que estavam no limite. Aplicar com `git apply propostas/01_canto_sem_arredondamento.diff`; depois rodar `tudo` e regravar a referência.
 
 **15. Configuração a conferir antes do treino.** O pré-registro declara a variante primária D4 com descritores (`preregistro.declaracoes.variante_primaria.descritores: true`), mas `entradas.descritores` está `false` no config. Isso é coerente com o padrão Q3, e o `avaliar_base` liga os descritores por conta própria. Mas **o treino precisa usar a mesma variante declarada**: confirmar a chave antes de treinar.
-
-**Melhorias e proteções de 05/11/2026 (v0.20.0), a partir dos itens 9 a 12.**
-
-**16. Proteção contra a excitação diferente entre sessões (item 11): `entradas.sem_intensidade`.** Com `true`, as entradas da IA perdem as 27 colunas medidas em unidade de intensidade: I0, razões de I0, `inicio_corr`/`final_corr` e as amplitudes A1/A2/C dos ajustes. Ficam só as **formas** do decaimento (τ, `t50`, `r_Ts`, `auc_Hs` relativos a I0, `fracao_rapida`, razões de `t50`), que não mudam com a força da excitação. **Desligada por padrão**: as razões de I0 são a "assinatura de cor", uma das informações mais fortes sobre a composição, e o simulado A↔B não mostraria o benefício (A e B têm o mesmo I0). É uma sensibilidade para quando houver treino: comparar com e sem.
-
-**17. Proteção contra ausentes que identificam a sessão (item 13): `entradas.max_ausentes_treino: 0.10` (ligada).** Tira das entradas as colunas com mais de 10% de ausentes **no treino** (A+B, sem saturados). O C não entra na conta. Saem `R_md_r_40s` (46%), `B_md_t10` (41%), `R_md_auc_30s` (31%) e `G_md_t10` (14%). O `R_md_r_20s` fica (3,4% no treino), embora tenha 10% de ausentes no C: usar o C para decidir seria olhar a prova. A variante principal (D4) não usava essas 4 colunas, e o `avaliar_base` dá os mesmos números (regra fixa I0 0,1851; `auc_10s` 0,2147).
-
-**18. Separar vazamento e pó no vermelho (item 9): testado e rejeitado.** A ideia era calibrar duas inclinações no vermelho, uma para os vídeos em que o sinal é quase todo vazamento de cor e outra para os que têm pó vermelho, separando pela fração do sinal explicada por vazamento (regra **medida**, com os coeficientes R/G = 0,246 e R/B = 0,046 dos pós únicos de A+B). O teste cruzado A↔B não mostrou ganho: a dispersão do vermelho foi de 10,08% (uma inclinação) para 10,00% a 10,05% (duas), e as duas inclinações ganharam em só 11 de 26 testes (17 de 26 no melhor limiar). Os grupos só diferem de verdade no τ (+9,5% contra +2,3% por nível); no `t50` e na área as inclinações já são parecidas (4,1 contra 2,7; 2,3 contra 2,5). Um achado a registrar: mesmo nos vídeos **com** pó vermelho, o vazamento explica em mediana 60% do sinal do canal vermelho. (Cálculo da verificação; não virou código.)
-
-**19. A queda do brilho com a ordem se cancela nas razões (item 12): confirmado.** As razões de I0 não têm tendência com a ordem das regravações: positivas em 20, 21 e 25 de 43 preparações (p = 0,76; 1,0; 0,36), com variação da 1ª à 5ª de −1,6% a −3,2%, sem significância. O I0 de cada canal cai (R −3,6%, G −2,0%, B −0,4% da 1ª à 5ª), mas em proporção parecida. Nada a corrigir. Seção 15 do `scripts/anomalias_amostras.py`.
-
-**Análise final de 05/11/2026 (v0.20.0): seções 16 e 17 do script; verificação completa.**
-
-**20. As entradas finais ainda diferenciam as sessões.** Em A×B, dentro de cada composição, a diferença entre as duas amostras responde em mediana por **32%** da variação das 77 colunas de entrada (configuração final, com descritores). As 8 colunas acima de 50% são quase todas de **intensidade do verde** (`G_md_I0` 83%, amplitudes do G 62% a 72%) e somem com `entradas.sem_intensidade` (sobra 1 acima de 50%). Nas colunas da D4, vai de 16% (razões de I0) a 47% (`G_md_auc_10s`); `G_md_t50` fica em 45%. Como cada amostra é uma preparação gravada numa sessão, isto mistura preparação e sessão, e não há como separar com estes dados (ver "Limites", item 5). É exatamente o que o teste em C mede.
-
-**21. Cobertura das composições.** `G0.5_B1` não tem nenhum vídeo utilizável no A (os 5 saturaram), então no treino tem só os 5 de B. Sete composições têm 3 ou 4 vídeos em alguma amostra (a menor: `G0.75_B0.75` com 3 no B). Os saturados se concentram em `G0.5_B1` A (5), `G0.75_B0.75` B (2), `B1.5` B (1) e `R0.5_G1` B (1).
-
-**22. Curadoria e ROI: sem problema novo.** 231 vídeos entram como `pendente` com auditoria `ok` (`consolidacao.incluir_pendentes_ok: true`), ou seja, sem aprovação manual um a um, por desenho. A auditoria confere arquivo, tempo e nome, **não o conteúdo**: foi assim que o `RB_05_1_v1a` passou. Os 6 vídeos do dataset com status "revisar" ou "fora do padrão" são os que você já aprovou em 02/11 (nomes corrigidos e cópias idênticas); nenhum é suspeito de ROI. Nenhum ajuste tem erro mais de 3 vezes maior que o dos irmãos.
-
-**23. Verificação técnica final.**
-- 305 testes passam no Windows e no Linux.
-- A conferência de regressão dá tudo OK **nas duas máquinas** (a correção do arredondamento resolveu a diferença).
-- 11 mutações detectadas: vazamento de diagnóstico e de `canal_ativo`, offset do preto, trava do C, trava do aval, C na calibração da luz, `canto_luz` como entrada, trava de estabilidade do canto, ausentes medidos com o C, `sem_intensidade` sem efeito, canto voltando a ser arredondado.
-- Pendências cosméticas: 2 f-strings sem campo (`colinearidade.py:316`, `deriva.py:290`).
 
 #### Correção da luz de fundo (`luminescencia luz`, `luz.py`, v0.18.0)
 

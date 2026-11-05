@@ -2,7 +2,7 @@
 
 Este guia é para quem nunca viu o projeto: o orientador, um colega, uma banca ou você daqui a seis meses. Não é preciso saber programar para entender as seções 1 a 3. As seções 4 e 5 descrevem cada parte do código. Detalhes técnicos e números estão no `README.md`; as decisões, com data, em `docs/DECISOES.md`.
 
-Versão do código descrita: **0.20.0** (05/11/2026), com 305 testes automáticos. Análise final em 05/11/2026.
+Versão do código descrita: **0.19.0** (04/11/2026), com 295 testes automáticos.
 
 ---
 
@@ -230,7 +230,6 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 - **Papel:** decide quais colunas a IA pode ver.
 - **Objetivo:** bloquear a identificação, a resposta (`prop_*`), tudo o que vem dela (`canal_ativo_*`, `usar_no_ajuste_*`, marcações de saturação) e os diagnósticos do ajuste (decisão E1). Decidir quais canais entram usa só regras **medidas** no vídeo.
 - **Entrega:** as funções `colunas_de_entrada`, `montar_entradas` e `carregar_entradas`, usadas por todas as análises e pela avaliação.
-- **Proteções extras (v0.20.0):** `max_ausentes_treino` (ligada) tira as colunas com mais de 10% de ausentes no treino, para que "coluna vazia" não vire pista de sessão; `sem_intensidade` (desligada, para usar como sensibilidade) tira as colunas em unidade de intensidade, que mudam com a força da excitação de cada sessão; `corrigir_luz` (ligada) usa as formas do decaimento corrigidas da luz de fundo.
 
 #### Avaliação (`avaliacao.py`, sem comando)
 - **Por que existe:** para definir, antes de qualquer IA, **como** ela será julgada.
@@ -329,39 +328,11 @@ pytest -q
 **Achados da verificação completa de 04/11/2026 (v0.19.0)** (README, itens 9 a 15):
 - a correção da luz funciona pior no C do que em A e B (declarar; nunca recalibrar com o C);
 - o C foi excitado com menos intensidade no vermelho (I0 −5,2%; razão R/G −2,8%): a IA pode ver "menos vermelho" no C;
-- a tendência do decaimento com a ordem das regravações vinha da luz e some com a correção; a queda do brilho (I0) continua, mas se cancela nas razões entre canais (confirmado);
-- proteções novas nas entradas: colunas com ausentes demais no treino saem (ligada) e as de intensidade podem sair (chave de sensibilidade);
-- separar vazamento e pó no vermelho foi testado e rejeitado (não melhora o teste cruzado);
+- a tendência do decaimento com a ordem das regravações vinha da luz e some com a correção; a queda do brilho (I0) continua;
 - sem duplicatas; a escolha de modelo é igual nas três sessões;
-- 25 cantos arredondados diferiam entre máquinas: corrigido no commit `50c206e` (o canto não é mais arredondado);
+- 25 cantos arredondados diferem entre máquinas: correção proposta em `propostas/01_canto_sem_arredondamento.diff`;
 - `entradas.descritores` precisa ser conferida contra a variante declarada no pré-registro antes do treino.
 
 **Pendências assumidas:** a deriva de sessão que sobra (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
 
 **Próximos passos, fora do escopo atual:** treinar a IA (k-vizinhos foi adiado), abrir C uma vez e, se o critério passar, a 2ª preparação de validação e o aplicativo.
-
----
-
-## 9. O que não se resolve em código
-
-Ao fim da análise de 05/11/2026, o código mede, mitiga ou protege tudo o que dá para tratar só com A e B. Os problemas abaixo estão nos **dados** ou no **desenho da coleta**. Para cada um, a tabela diz por que o código não resolve, o que resolveria e o que fazer agora. Nenhum pode ser corrigido olhando o C: isso transformaria a prova cega num ajuste à prova.
-
-| # | Problema | Por que o código não resolve | O que resolveria | O que fazer agora |
-|---|---|---|---|---|
-| 1 | **`RB_05_1_v1a` parece ser de outra composição** (cor e decaimento de `RG_05_1`) | O código não sabe o que foi gravado; só mostra que não bate | Assistir ao vídeo (ou lembrar da gravação) | Decidir na curadoria **antes de treinar** |
-| 2 | **Luz de fundo durante a gravação**, o maior artefato conhecido | A causa física não foi confirmada; a correção estatística reduz o efeito (separação +22%), mas não o elimina | Gravar no escuro, com um vídeo de controle por sessão | Fazer o teste de luz acesa × apagada; declarar |
-| 3 | **Correção da luz mais fraca no C** (ρ residual R +0,46) | Ajustar olhando o C seria usar a prova | Uma causa física confirmada (item 2) | Declarar ao ler o resultado em C |
-| 4 | **Excitação mais fraca no vermelho no C** (I0 −5,2%; razão R/G −2,8%) | Medir a diferença exige olhar o C | Controlar a excitação (lâmpada, tempo) em cada gravação | Declarar: "a IA pode ver menos vermelho no C"; `sem_intensidade` como sensibilidade |
-| 5 | **Sessão e preparação confundidas**: cada amostra é uma preparação gravada numa sessão | Não há como separar o efeito do preparo do efeito da sessão com estes dados; as entradas ainda carregam diferença A×B (mediana 32% da variação dentro da composição) | Outro desenho: várias preparações por sessão, ou a mesma preparação em várias sessões | Declarar; é o que o teste em C mede |
-| 6 | **Só 1 preparação de validação por composição** (D6) | Dados, não código: o intervalo de confiança do erro em C fica largo | Uma 2ª preparação (`docs/plano_segunda_preparacao.md`) | Aguardar o orientador |
-| 7 | **`G0.5_B1` sem amostra A no treino** (os 5 vídeos saturaram) | Saturação é medida perdida | Regravar com menos exposição | O treino dessa composição usa só os 5 vídeos de B |
-| 8 | **9 vídeos saturados** fora do treino e da validação | A parte saturada da curva não existe nos dados | Regravar com menos exposição | Rever depois (D5) |
-| 9 | **O vazamento de cor domina o canal vermelho** (explica em mediana 60% do sinal mesmo com pó vermelho) | Limitação da câmera RGB: os canais não são cores puras | Outra câmera ou filtros ópticos | Declarar: o R é o canal mais difícil |
-| 10 | **O brilho cai ao longo das regravações** (R −3,6%, G −2,0% da 1ª à 5ª) | A causa (fadiga do pó, aquecimento da lâmpada) é desconhecida; usar a ordem como correção não funciona num vídeo novo | Descobrir a causa e controlá-la | Nada: se cancela nas razões entre canais |
-| 11 | **Suposição do controle**: a diferença canto/ROI é a mesma em todas as sessões | Há um único vídeo de controle | Um vídeo de controle por sessão | Mitigado pelo `offset`; declarar |
-| 12 | **`R1.5` sem sinal em G e B** | Ausência física, não falta de dado | — | Nunca preencher com a proporção |
-| 13 | **Poucos dados**: cerca de 29 preparações no treino A+B | Nenhum código cria preparações | Mais preparações | Preferir modelos simples; sensibilidades em A↔B |
-| 14 | **Decisões provisórias**: D2, D6 e a correção da luz aguardam o orientador | São decisões de método | A reunião com o orientador | Depois do aval: preencher `preregistro.aval_orientador` e rodar `preregistrar` |
-| 15 | **`C/1/RGB_05_05_05_v1a` pendente** (`R0.5_G0.5_B0.5` fica com 4 vídeos no C) | É uma decisão de curadoria | Decidir (D-pipeline 6: "só no fim") | Decidir antes de abrir o C |
-
-**Em uma frase:** o projeto mede com cuidado, protege a IA de pistas falsas e documenta o que não é possível consertar. O que sobra exige uma gravação nova (itens 2, 4, 7, 8, 9, 11), mais dados (5, 6, 13), uma decisão (1, 14, 15) ou ser declarado ao ler o resultado (3, 4, 5, 10, 12).

@@ -2,24 +2,6 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
-## [docs] — 2026-11-05 (análise final da v0.20.0)
-- `scripts/anomalias_amostras.py`: seções 16 (quanto as entradas finais ainda diferenciam as sessões) e 17 (cobertura das composições).
-- README: "Limites que não se resolvem em código" (15 itens) e itens 20 a 23 das anomalias; guia, seção 9; DECISOES com a verificação final.
-
-## [0.20.0] — 2026-11-05
-- `entradas.max_ausentes_treino` (config: 0,10): tira das entradas as colunas com ausentes demais no treino (A+B); `entradas.colunas_com_ausentes`.
-- `entradas.sem_intensidade` (config: false): tira as colunas em unidade de intensidade; `entradas.eh_intensidade`.
-- `scripts/anomalias_amostras.py`: seção 15 (razões de I0 × ordem das regravações).
-- 9 testes novos (`test_entradas_protecoes.py`). Separar vazamento e pó no vermelho: testado e rejeitado (README, item 18).
-
-## [sem número de versão] — 2026-11-05 00:11 (commit `50c206e`, entre a v0.19.0 e a v0.20.0)
-Commit que mudou código sem trocar o número da versão. O código desse commit diz `0.19.0`, mas **não é igual à v0.19.0** (commit `7b2c505`):
-- `consolidacao.canto_do_video`: o canto do preto não é mais arredondado a 2 casas. Em 25 cantos a mediana caía exatamente em x,xx5 e o empate era decidido de forma diferente no Windows e no Linux, o que dava 1 divergência na conferência de regressão. O preto muda no máximo 0,009 nível; os 2 ajustes do canal B que tinham trocado de modelo na v0.17.0 voltam ao modelo anterior. 1 teste novo em `test_consolidacao.py`.
-- `tests/referencia/referencia.json` regravada com essa correção (o carimbo da referência diz `0.19.0`).
-- Documentação: o restante da entrada "[docs] — 2026-11-04" abaixo (anomalias 9 a 15, seções 8 a 14 do script, guia) entrou neste mesmo commit.
-
-Para saber se um checkout tem a correção, confira o commit (`git log`), não o número da versão: qualquer versão a partir da 0.20.0 tem.
-
 ## [docs] — 2026-11-04 (verificação completa da v0.19.0)
 - `scripts/anomalias_amostras.py`: seções 8 a 14 (o que sobra depois da correção da luz, I0 por sessão, ausentes e modelos por sessão, duplicatas, assinatura de decaimento, ordem das regravações depois da correção).
 - README: itens 9 a 15 de "Anomalias entre amostras" e a pendência 3 (arredondamento do canto) no topo; guia e DECISOES atualizados.
