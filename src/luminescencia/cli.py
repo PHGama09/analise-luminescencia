@@ -29,7 +29,7 @@ def _cmd_ajustar(args, cfg):
     aj = cfg.get("ajuste", {})
     df = pd.read_csv(args.csv)
     tabela = ajustar_canais(
-        df, cfg.get("protocolo", {}).get("instante_queda_s", 20), aj.get("canais", {}),
+        df, cfg.get("protocolo", {}).get("instante_queda_s", 0.5), aj.get("canais", {}),
         modelos=aj.get("modelos", ["exp_simples", "exp_dupla"]),
         r2_minimo=aj.get("r2_minimo"), delta_bic=aj.get("delta_bic"),
         fracao_minima_componente=aj.get("fracao_minima_componente"),
@@ -112,7 +112,7 @@ def _cmd_deriva(args, cfg):
 def _cmd_colinearidade(args, cfg):
     from .colinearidade import rodar
 
-    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida)
+    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida, so_treino=args.so_treino)
 
 
 def _cmd_janela_r(args, cfg):
@@ -125,6 +125,30 @@ def _cmd_saturados(args, cfg):
     from .saturados import rodar
 
     return rodar(cfg, pasta_pos=args.pos, pasta_modelagem=args.modelagem, saida=args.saida)
+
+
+def _cmd_ic_simulacao(args, cfg):
+    from .ic_simulacao import rodar
+
+    return rodar(cfg, pasta_deriva=args.deriva, saida=args.saida)
+
+
+def _cmd_qualidade(args, cfg):
+    from .qualidade import rodar
+
+    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida)
+
+
+def _cmd_avaliar_base(args, cfg):
+    from .linhas_base import rodar
+
+    return rodar(cfg, pasta_tabela=args.tabela, saida=args.saida, config_path=args.config)
+
+
+def _cmd_preregistrar(args, cfg):
+    from .preregistro import rodar
+
+    return rodar(cfg, forcar=args.forcar, pasta_tabela=args.tabela, config_path=args.config)
 
 
 def _cmd_tudo(args, cfg):
@@ -240,7 +264,8 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("colinearidade", parents=[comum], help="Q4/B13. Correlação, VIF, agrupamento e dimensões efetivas das colunas de entrada (só análise)")
     p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e os dicionários (padrão: output/tabela)")
-    p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/colinearidade; com --so-treino: output/colinearidade_AB)")
+    p.add_argument("--so-treino", action="store_true", help="só as amostras de treino (divisao.treino, A+B) e sem os saturados; compara com output/colinearidade")
     p.set_defaults(func=_cmd_colinearidade)
 
     p = sub.add_parser("janela_r", parents=[comum], help="Q4/B12. Fim de janela específico do R: reajusta o R com outras regras de fim e compara tau, t50, CV e ajustabilidade (só análise)")
@@ -255,7 +280,26 @@ def main(argv=None) -> int:
     p.add_argument("--modelagem", help="pasta com ajustes.csv, só para conferir o caminho a_parte (padrão: output/modelagem)")
     p.add_argument("--saida", help="pasta de saída (padrão: output/saturados)")
     p.set_defaults(func=_cmd_saturados)
+    p = sub.add_parser("ic_simulacao", parents=[comum], help="Bloco 2C/D6. Simula o IC 95%% do MAE em C com 1, 2 e 3 preparações e a chance de passar o critério D3 por sorte (só análise)")
+    p.add_argument("--deriva", help="pasta com os CSVs de deriva (padrão: output/deriva)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/ic_simulacao)")
+    p.set_defaults(func=_cmd_ic_simulacao)
 
+    p = sub.add_parser("qualidade", parents=[comum], help="Bloco 2B. Qualidade e viés dos diagnósticos do ajuste (r2, rmse, n_pontos, fim_s, ok): η² por proporção e amostra, vídeos de baixo peso candidatos (só análise; nenhum peso é aplicado)")
+    p.add_argument("--tabela", help="pasta com dataset.csv e descritores.csv (padrão: output/tabela)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/qualidade)")
+    p.set_defaults(func=_cmd_qualidade)
+
+
+    p = sub.add_parser("avaliar_base", parents=[comum], help="Bloco 1. Linhas de base SEM aprendizado (média do treino e regra fixa por I0/auc_10s) em A<->B e leave-one-proporção-out; nunca abre C")
+    p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e dicionários (padrão: output/tabela)")
+    p.add_argument("--saida", help="pasta de saída (padrão: output/avaliacao)")
+    p.set_defaults(func=_cmd_avaliar_base)
+
+    p = sub.add_parser("preregistrar", parents=[comum], help="Bloco 1. Grava docs/preregistro.json/.md (hashes, variante primária, critério D3, validação); recusa sobrescrever sem --forcar")
+    p.add_argument("--tabela", help="pasta com dataset.csv, descritores.csv e dicionários (padrão: output/tabela)")
+    p.add_argument("--forcar", action="store_true", help="substitui um pré-registro existente (o antigo é guardado com data)")
+    p.set_defaults(func=_cmd_preregistrar)
 
     p = sub.add_parser("tudo", parents=[comum], help="6e. Roda a cadeia consolidar -> ... -> graficos e carimba a versão nos relatórios")
     p.add_argument("--de", choices=NOMES_ETAPAS, help="primeira etapa a rodar (padrão: consolidar)")

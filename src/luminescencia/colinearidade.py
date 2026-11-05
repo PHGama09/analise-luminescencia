@@ -9,6 +9,10 @@ padronizado, fração de variância acumulada) e os casos específicos cl x c0 e
 proporção, que mostra se a relação sobrevive quando a composição é fixa). A proporção só agrupa a análise; nunca é coluna.
 Propõe (sem aplicar) conjuntos mínimos de entradas: um representante por grupo de |r| alto e poda por VIF, dentro de cada reservatório
 de colunas definido por padrões no config. Nenhuma lista de colunas ou conclusão está escrita aqui: tudo vem dos CSVs e do config.
+
+Opção `colinearidade.amostras` (padrão None = todas as linhas, comportamento original) e flag --so-treino (v0.16.2): restringem a análise às
+amostras de treino (divisao.treino, A+B) e tiram os vídeos com excluido_saturacao (D5), gravando em output/colinearidade_AB/ e comparando
+com a análise de todas as linhas (output/colinearidade/) em comparacao_com_base.txt. Só análise; nada é aplicado.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ def parametros(cfg: dict) -> dict:
             "misto": [r"^[RGB]_(cl|c0)_(tau1|tau2|tau_medio|fracao_rapida|A1|A2|C)$", r"^[RGB]_md_", r"^razao_", r"^(inicio|final)_corr_[RGB]$"],
         },
         "casos": {"par_caminho": ["cl", "c0"], "par_tau_t50": ["tau_medio", "md_t50"]}, "dpi": 120, "min_linhas": 30,
+        "amostras": None,                            # None = todas as amostras (original); lista = só estas (ex.: [A, B])
     }
     p.update(cfg.get("colinearidade", {}) or {})
     if not 0 < p["limite_r"] < 1 or not 0 < p["variancia_pca"] <= 1:
@@ -45,7 +50,29 @@ def parametros(cfg: dict) -> dict:
     for nome, pads in p["conjuntos"].items():
         for pad in pads:
             re.compile(pad)
+    am = p["amostras"]
+    if am is not None:
+        if isinstance(am, str) or not isinstance(am, (list, tuple)) or not am:
+            raise ValueError("colinearidade.amostras deve ser null ou uma lista não vazia de amostras (ex.: [A, B])")
+        p["amostras"] = [str(a) for a in am]
     return p
+
+
+def _verdadeiro(v) -> bool:
+    return str(v).strip().lower() in ("true", "1", "1.0")
+
+
+def filtrar_linhas(ds: pd.DataFrame, amostras=None, excluir_saturados: bool = False) -> pd.DataFrame:
+    """Sem filtro devolve `ds` como veio. Com `amostras`, só essas; com `excluir_saturados`, sem as linhas excluido_saturacao (D5)."""
+    if not amostras and not excluir_saturados:
+        return ds
+    if amostras:
+        ds = ds[ds["amostra"].astype(str).isin([str(a) for a in amostras])]
+    if excluir_saturados:
+        if "excluido_saturacao" not in ds.columns:
+            raise ValueError("dataset.csv sem a coluna excluido_saturacao: não dá para tirar os saturados")
+        ds = ds[~ds["excluido_saturacao"].map(_verdadeiro)]
+    return ds.reset_index(drop=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------- colunas
@@ -245,18 +272,78 @@ def figura(sp: pd.DataFrame, Z, ordem, rot: pd.Series, destino: Path, corte: flo
     plt.close(fig)
 
 
+# ----------------------------------------------------------------------------------------------------------------- comparação
+def _chave_par(a: str, b: str) -> str:
+    return " | ".join(sorted([str(a), str(b)]))
+
+
+def _conj(s) -> list[str]:
+    return str(s).split() if isinstance(s, str) else []
+
+
+def comparar_com_base(pasta_ab, pasta_base, grupo_pares: str = "todas|sem_diag") -> tuple[list[str], dict]:
+    """Compara duas saídas de `rodar` (a restrita e a de todas as linhas) lendo só os CSVs gravados: dimensões efetivas, número de pares
+    acima do limite, pares e colunas que entraram/saíram, e os conjuntos mínimos (mantidas / só na base / só na restrita)."""
+    nomes = ["colinearidade_dimensoes.csv", "colinearidade.csv", "colinearidade_clusters.csv", "conjuntos_propostos.csv"]
+    lidos = {}
+    for n in nomes:
+        for rot, pasta in (("ab", pasta_ab), ("base", pasta_base)):
+            f = Path(pasta) / n
+            if not f.exists():
+                return [f"Comparação não feita: falta {f}. Rode antes 'luminescencia colinearidade' (todas as linhas) sobre a mesma tabela."], {}
+            lidos[(rot, n)] = pd.read_csv(f, encoding="utf-8-sig")
+    dim = lidos[("base", nomes[0])].merge(lidos[("ab", nomes[0])], on="grupo", how="outer", suffixes=("_base", "_ab"))
+    dim = dim[["grupo", "n_colunas_base", "n_colunas_ab", "n_linhas_base", "n_linhas_ab", "dimensoes_95_base", "dimensoes_95_ab"]]
+    pb, pa = lidos[("base", nomes[1])], lidos[("ab", nomes[1])]
+    cont = pd.concat([pb.groupby("grupo", sort=False).size().rename("pares_base"), pa.groupby("grupo", sort=False).size().rename("pares_ab")], axis=1)
+    cont = cont.fillna(0).astype(int).reset_index().rename(columns={"index": "grupo"})
+    chaves = lambda df: {_chave_par(a, b) for a, b in zip(df.loc[df["grupo"] == grupo_pares, "coluna_a"], df.loc[df["grupo"] == grupo_pares, "coluna_b"])}
+    kb, ka = chaves(pb), chaves(pa)
+    cb = lidos[("base", nomes[2])]
+    ca = lidos[("ab", nomes[2])]
+    ub, ua = set(cb.loc[cb["grupo"] == "todas", "coluna"]), set(ca.loc[ca["grupo"] == "todas", "coluna"])
+    cj_b, cj_a = lidos[("base", nomes[3])], lidos[("ab", nomes[3])]
+    cj_b = {(r["conjunto"], float(r["vif_maximo_regra"])): _conj(r["colunas"]) for _, r in cj_b.iterrows()}
+    cj_a = {(r["conjunto"], float(r["vif_maximo_regra"])): _conj(r["colunas"]) for _, r in cj_a.iterrows()}
+    conjuntos = {}
+    for k in cj_b:
+        if k in cj_a:
+            sb, sa = set(cj_b[k]), set(cj_a[k])
+            conjuntos[f"{k[0]}|{k[1]:g}"] = {"mantidas": sorted(sb & sa), "so_base": sorted(sb - sa), "so_ab": sorted(sa - sb)}
+    res = {"colunas_entraram": sorted(ua - ub), "colunas_sairam": sorted(ub - ua), "pares_entraram": sorted(ka - kb), "pares_sairam": sorted(kb - ka), "conjuntos": conjuntos}
+    L = ["COMPARAÇÃO COM A ANÁLISE DE TODAS AS LINHAS (base = %s; restrita = %s)" % (pasta_base, pasta_ab), "-" * 78,
+         "Dimensões efetivas e nº de colunas/linhas por grupo (colunas *_base = todas as linhas; *_ab = restrita):", dim.round(3).to_string(index=False), "",
+         f"Pares com |r| > limite por grupo (base x restrita):", cont.to_string(index=False), "",
+         f"Colunas analisadas ('todas'): {len(ub)} na base, {len(ua)} na restrita; entraram {len(res['colunas_entraram'])}: {', '.join(res['colunas_entraram']) or '-'}; saíram {len(res['colunas_sairam'])}: {', '.join(res['colunas_sairam']) or '-'}",
+         f"Pares |r| alto ('{grupo_pares}'): {len(kb)} na base, {len(ka)} na restrita; só na restrita {len(res['pares_entraram'])}, só na base {len(res['pares_sairam'])}",
+         "  só na restrita (até 25): " + ("; ".join(res["pares_entraram"][:25]) or "-"), "  só na base (até 25): " + ("; ".join(res["pares_sairam"][:25]) or "-"), "",
+         "CONJUNTOS MÍNIMOS (propostos, não aplicados): mantidas / só na base / só na restrita"]
+    for k, v in conjuntos.items():
+        L += [f"[{k}] mantidas {len(v['mantidas'])}: {', '.join(v['mantidas']) or '-'}", f"   só na base {len(v['so_base'])}: {', '.join(v['so_base']) or '-'}",
+              f"   só na restrita {len(v['so_ab'])}: {', '.join(v['so_ab']) or '-'}"]
+    return L, res
+
+
 def _tabela_txt(df: pd.DataFrame, n: int = 15) -> str:
     return df.head(n).round(3).to_string(index=False)
 
 
-def rodar(cfg: dict, pasta_tabela=None, saida=None) -> int:
+def rodar(cfg: dict, pasta_tabela=None, saida=None, so_treino: bool = False, pasta_base=None) -> int:
     p = parametros(cfg)
+    amostras, sem_sat = p["amostras"], False
+    if so_treino:                                                    # protocolo: treino = divisao.treino (A+B) e saturados fora (D5)
+        amostras, sem_sat = [str(a) for a in (cfg.get("divisao", {}) or {}).get("treino", ["A", "B"])], True
+    filtro = bool(amostras) or sem_sat
     base = Path(cfg.get("pastas", {}).get("saida", "output"))
     pasta = Path(pasta_tabela or base / "tabela")
-    saida = Path(saida or base / "colinearidade")
+    saida = Path(saida or base / ("colinearidade_" + ("AB" if so_treino else "".join(amostras)) if filtro else "colinearidade"))
     saida.mkdir(parents=True, exist_ok=True)
     ler = lambda nome: pd.read_csv(pasta / nome, encoding="utf-8-sig")
     ds, de, dic, dic_desc = ler("dataset.csv"), ler("descritores.csv"), ler("dicionario.csv"), ler("dicionario_descritores.csv")
+    n_total = len(ds)
+    ds = filtrar_linhas(ds, amostras, sem_sat)
+    if filtro and len(ds) < p["min_linhas"]:
+        raise ValueError(f"só {len(ds)} vídeos após o filtro (amostras {amostras}, sem saturados: {sem_sat}); mínimo colinearidade.min_linhas = {p['min_linhas']}")
     tab, origem = candidatas(ds, de, dic, dic_desc, cfg)
     cols = list(origem)
     manter, fora = separar_constantes(tab[cols], p)
@@ -303,6 +390,7 @@ def rodar(cfg: dict, pasta_tabela=None, saida=None) -> int:
     figura(*graf, saida / "colinearidade_mapa.png", p["corte_cluster"], p["dpi"])
 
     todas = pares[pares["grupo"] == "todas|sem_diag"]
+    n_prep = int(ds.groupby(["proporcao", "amostra"]).ngroups) if len(ds) else 0
     n_diag = sum(e_diagnostico(c, p) for c in manter)
     L = ["COLINEARIDADE DAS ENTRADAS (B13, só análise; nada foi aplicado)", "=" * 78,
          f"Candidatas (permitidas por entradas.py): {len(cols)} ({sum(o == 'dataset' for o in origem.values())} do dataset, {sum(o == 'descritores' for o in origem.values())} dos descritores); "
@@ -336,6 +424,14 @@ def rodar(cfg: dict, pasta_tabela=None, saida=None) -> int:
               f"   treino {', '.join(treino)}: {r['videos_treino']} vídeos = {r['preparacoes_treino']} preparações (proporção x amostra) -> {len(c['colunas']) / max(r['preparacoes_treino'], 1):.2f} colunas por preparação"]
     L += ["", "RISCO DE SOBREAJUSTE: as regravações de uma mesma amostra são quase duplicatas (CV baixo); o número de unidades independentes é o de preparações,",
           "não o de vídeos. Colunas redundantes (|r| alto) não acrescentam informação, só graus de liberdade. Validar sempre agrupando por amostra (ver C17)."]
+    if filtro:
+        L.insert(2, f"Linhas usadas: {len(ds)} vídeos de {n_total} do dataset.csv (amostras {', '.join(amostras) if amostras else 'todas'}; "
+                    f"{'saturados fora' if sem_sat else 'saturados mantidos'}) = {n_prep} preparações (proporção x amostra).")
+        base_cmp = Path(pasta_base) if pasta_base else base / "colinearidade"
+        if base_cmp.resolve() != saida.resolve():
+            Lc, _ = comparar_com_base(saida, base_cmp)
+            (saida / "comparacao_com_base.txt").write_text("\n".join(Lc) + "\n", encoding="utf-8", newline="\n")
+            L += ["", *Lc]
     (saida / "relatorio_colinearidade.txt").write_text("\n".join(L) + "\n", encoding="utf-8", newline="\n")
     print("\n".join(L[:12]))
     print(f"\nSalvo em {saida}")

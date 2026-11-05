@@ -180,6 +180,7 @@ colinearidade:
   corte_cluster: 0.05         # agrupamento hierárquico por 1-|r| (0,05 = |r| >= 0,95 no mesmo grupo)
   fracao_nan_maxima: 0.30     # coluna mais vazia que isto sai da análise
   min_linhas: 30
+  amostras: null              # null = todas as linhas (original); [A, B] = só estas. A flag --so-treino usa divisao.treino e tira os saturados
   # colunas que descrevem o ajuste/janela (não o decaimento): entram na análise "completa", saem da "sem_diag" e dos conjuntos propostos
   excluir_dos_conjuntos: ['_modelo$', '_ok$', '^sinal_presente_', '_r2$', '_rmse$', '_n_pontos$', '_inicio_s$', '_fim_s$']
   preferencia: ['_tau_medio$', '_md_I0$', '_md_t50$', '_md_r_5s$', '_md_auc_10s$']   # representante preferido dentro de um grupo redundante
@@ -224,3 +225,100 @@ saturados:
   t50_pontos_i0: 5            # t50 sem modelo: I0 = mediana dos primeiros pontos da janela
   t50_suavizacao_pontos: 5    # e mediana móvel desta largura
   workers: null               # null = modelagem.workers (limitado ao número de CPUs)
+
+# BLOCO 2B (qualidade.py): qualidade e viés dos diagnósticos do ajuste (r2, rmse, n_pontos, fim_s, inicio_s, ok). Só análise; nenhum peso é aplicado.
+qualidade:
+  amostras: null              # null = divisao.treino (A+B). A amostra C nunca entra; os saturados também ficam fora
+  n_permutacoes: 2000         # permutação no nível da PREPARAÇÃO (proporção x amostra), nunca do vídeo
+  semente: 20261104
+  # LIMIARES DE DECISÃO (não são resultados; provisórios, o orientador confirma):
+  limite_eta2_prop: 0.10      # η² AJUSTADO (observado - média sob permutação) da proporção abaixo disto = "usável como peso"
+  limite_eta2_amostra: 0.10   # variância adicional da amostra (depois da proporção) a partir da qual há aviso de deriva de sessão
+  alfa: 0.05                  # "viés" exige η² ajustado >= limite E p < alfa; com p >= alfa o veredito é "inconclusivo"
+  min_linhas: 30              # diagnóstico com menos linhas válidas: "dados insuficientes"
+  min_proporcoes: 4           # ... ou com valores em menos proporções que isto
+  quantil_baixo: 0.10         # candidato a baixo peso = estritamente pior que este quantil (diagnóstico binário: o valor pior, se minoritário)
+  fracao_prep_maioria: 0.5    # preparação "com maioria candidata" = fração de vídeos candidatos >= isto
+  direcao:                    # qual lado é o MELHOR de cada diagnóstico (inicio_s é suposição; confirme)
+    r2: maior
+    ok: maior
+    n_pontos: maior
+    fim_s: maior
+    rmse: menor
+    inicio_s: menor
+
+# BLOCO 1 (avaliacao.py): dobras agrupadas por preparação, métricas e trava da amostra C. Só A+B; nada aqui abre C.
+avaliacao:
+  amostras_treino: [A, B]       # treino/validação interna (unidade = proporção x amostra)
+  amostra_final: C              # só via avaliacao.abrir_c (precisa de docs/preregistro.json válido)
+  soma_proporcoes: 1.5          # fração-alvo f = prop / 1,5 (soma 1)
+  tolerancia_soma: 1.0e-6       # tolerância da conferência "frações somam 1"
+  bootstrap_n: 5000             # reamostragens de preparações para os IC 95%
+  semente: 20261104             # semente fixa do bootstrap (mesma saída em toda rodada)
+  nivel_ic: 0.95
+  pasta_tabela: null            # null = <pastas.saida>/tabela
+
+# BLOCO 1 (linhas_base.py, comando avaliar_base): linhas de base SEM aprendizado, só A<->B e leave-one-proporção-out. Nunca C.
+linhas_base:
+  esquemas: [a_b, leave_one_proporcao_out]   # opcional também: por_preparacao
+  regra_fixa:
+    grandezas: [I0, auc_10s]    # fração do canal proporcional à grandeza, normalizada para somar 1; a PRIMEIRA é a primária (piso de D3(c))
+  entradas:                     # sobrepõe [entradas] só em memória, só neste comando (o bloco entradas acima não muda)
+    caminhos: [c0]
+    descritores: true
+    canais_sem_po: true
+    bloquear_diagnosticos: true
+    descritores_sem_nao_confiaveis_R: false
+  proporcoes_sensibilidade: [G0.5_B1, R1.5]  # métricas repetidas SEM cada uma (G0.5_B1 nunca está em A; R1.5 não tem G/B)
+  saida: avaliacao              # pasta dentro de pastas.saida
+
+# BLOCO 1 (preregistro.py, comando preregistrar): o que fica congelado antes de abrir C. As declarações abaixo são copiadas para
+# docs/preregistro.json; mudar qualquer item (ou o conteúdo das seções listadas) depois de preregistrar trava abrir_c.
+preregistro:
+  arquivo_json: docs/preregistro.json
+  arquivo_md: docs/preregistro.md
+  arquivos_tabela: [dataset.csv, descritores.csv, dicionario.csv, dicionario_descritores.csv]   # em <pastas.saida>/tabela
+  secoes_config: [protocolo, ajuste, posprocessamento, modelagem, entradas, descritores, avaliacao, linhas_base, preregistro]
+  declaracoes:
+    variante_primaria:
+      id: c0_descritores
+      decisao: D4
+      caminhos: [c0]
+      descritores: true
+      descritores_prioritarios: [razoes entre canais, t50, r_5s, auc_10s]
+      conjuntos_de_colunas: [so_descritores, so_tau, misto]
+      canais_sem_po: true
+      bloquear_diagnosticos: true
+      dependencia_declarada: o resultado depende do início da janela de ajuste (2,5 s no protocolo atual)
+    sensibilidades:
+      - caminho cl e caminhos cl+c0
+      - sem descritores
+      - canais_sem_po false (sinal forte medido; não equivale a "sem vazamento")
+      - métricas com e sem a proporção G0.5_B1
+    criterio_d3:
+      decisao: D3
+      nivel_minimo_razao_max: 0.70     # MAE médio em C <= 70% do MAE da média
+      nivel_forte_razao_max: 0.50      # MAE médio em C <= 50% do MAE da média
+      condicao_b: nenhuma proporção com MAE pior que o da média
+      condicao_c: ganho pareado por proporção (16 pares) sobre a regra fixa física (fração do canal proporcional ao seu I0, normalizada para somar 1; sem parâmetros ajustados), IC 95% por reamostragem que não inclui 0; k-vizinhos adiado, nenhum modelo por enquanto
+      falha: falhou em (b) ou (c), ou ficou acima de 70% = não demonstrado
+    validacao_d2:
+      estado: provisória (levar ao orientador)
+      interna: A<->B para escolher entradas e hiperparâmetros; leave-one-proporção-out só como estresse; leave-one-preparação-out como apoio
+      unidade: preparação (proporção x amostra); regravações sempre do mesmo lado
+      final: C aberta uma vez, no fim, via abrir_c
+      limite_d6: uma preparação de validação por composição (D6, provisória)
+
+ic_simulacao:                  # Bloco 2C / D6 (provisória): IC do erro em C por simulação; só análise
+  pasta_deriva: deriva         # dentro de pastas.saida; lê deriva_variancia.csv, deriva_por_grandeza.csv, deriva_celulas.csv
+  grandezas: [razao_I0, razao_t50, t50, r_5s, auc_10s]   # descritores da D4 (linhas de deriva_variancia.csv usadas nas frações)
+  cenarios_quantil: {mediana: 0.5, p75: 0.75}            # quantil das frações medidas entre as linhas; p75 = deriva maior
+  n_preparacoes: [1, 2, 3]
+  n_regravacoes: 5             # regravações por preparação (média por preparação)
+  mae_verdadeiro: [0.05, 0.075, 0.10, 0.125, 0.15, 0.175, 0.20]   # grade hipotética do MAE verdadeiro
+  replicas: 20000
+  semente: 12345
+  nivel_ic: 0.95
+  nivel_minimo_razao_max: 0.70   # iguais a preregistro.criterio_d3 (D3)
+  nivel_forte_razao_max: 0.50
+  proporcoes: null             # null = união de deriva_celulas.csv e deriva_descartadas.csv

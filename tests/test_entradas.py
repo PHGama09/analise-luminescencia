@@ -21,7 +21,8 @@ def test_nunca_meta_alvo_ou_canal_ativo():
     df, dic = _tabela()
     cols = colunas_de_entrada(dic, parametros({}))
     assert not {"video", "amostra", "prop_G", "canal_ativo_G", "excluido_saturacao", "usar_no_ajuste_G"} & set(cols)
-    assert {"sinal_presente_G", "G_cl_tau_medio", "G_c0_tau_medio", "G_cl_ok"} <= set(cols)
+    assert {"sinal_presente_G", "G_cl_tau_medio", "G_c0_tau_medio"} <= set(cols)
+    assert not {"G_cl_ok", "G_c0_ok"} & set(cols)                                    # E1: diagnósticos não são entrada (padrão)
 
 
 def test_so_um_caminho_tira_tambem_as_flags_do_outro():
@@ -74,7 +75,7 @@ def test_ligar_descritores_junta_por_video_sem_meta_nem_alvo():
     desc, dic_desc = _descritores()                          # note: linhas em ordem diferente (b, a); a junção é por video
     out = montar_entradas(df, dic, {"entradas": {"descritores": True}}, desc, dic_desc)
     assert out.loc[0, "R_md_t50"] == 4.0 and out.loc[1, "R_md_t50"] == 3.0            # a = linha 0 do dataset
-    assert {"G_md_t50", "razao_t50_G_B", "R_md_ok"} <= set(out.columns)
+    assert {"G_md_t50", "razao_t50_G_B", "R_md_t50"} <= set(out.columns) and "R_md_ok" not in out.columns
     assert not {"video", "amostra", "prop_G", "canal_ativo_G"} & set(out.columns)
     df2 = df.copy(); df2["prop_G"] = [0.0, 1.0]; df2["canal_ativo_G"] = [False, True]
     assert out.equals(montar_entradas(df2, dic, {"entradas": {"descritores": True}}, desc, dic_desc))      # mudar o alvo não muda nada
@@ -83,7 +84,7 @@ def test_ligar_descritores_junta_por_video_sem_meta_nem_alvo():
 def test_regra_de_sinal_esvazia_tambem_os_descritores_e_as_razoes_do_canal_fraco():
     df, dic = _tabela()
     desc, dic_desc = _descritores()
-    cfg = {"entradas": {"descritores": True, "canais_sem_po": False, "limiar_inicio_corr": {"R": 0, "G": 150, "B": 0}}}
+    cfg = {"entradas": {"descritores": True, "canais_sem_po": False, "limiar_inicio_corr": {"R": 0, "G": 150, "B": 0}, "bloquear_diagnosticos": False}}
     out = montar_entradas(df, dic, cfg, desc, dic_desc)                                # b tem inicio_corr_G = 120 < 150
     assert np.isnan(out.loc[1, "G_md_t50"]) and out.loc[0, "G_md_t50"] == 6.0
     assert np.isnan(out.loc[1, "razao_t50_R_G"]) and np.isnan(out.loc[1, "razao_t50_G_B"]) and not bool(out.loc[1, "G_md_ok"])

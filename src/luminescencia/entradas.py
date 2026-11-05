@@ -20,6 +20,11 @@ A regra de sinal (canais_sem_po: false) esvazia também os descritores do canal 
 entradas.descritores_sem_nao_confiaveis_R: true tira R_md_t10, R_md_r_20s e R_md_r_40s (lista em descritores.nao_confiaveis_R); o padrão
 (false) mantém todas, como decidido na Q2.
 
+Colunas de diagnóstico (E1, 04/11/2026): entradas.bloquear_diagnosticos: true (PADRÃO) tira de entrada os diagnósticos do ajuste e da janela
+(<canal>_<cl|c0|md>_ok, _r2, _rmse, _inicio_s, _fim_s, _n_pontos). Eles descrevem a janela e o ruído (dependem do brilho e da saturação), não o
+pó: seriam um atalho para o alvo. Continuam no dataset para controle de qualidade e para pesos (colunas_de_diagnostico). A ausência de ajuste
+continua visível como NaN nas colunas de ajuste. false = variante exploratória declarada, nunca o padrão.
+
 Cuidado com a interpretação: nos dados atuais o nível inicial do canal sem o pó se SOBREPÕE ao do canal com o pó (G: sem o pó
 vai até ~212 níveis, com o pó começa em ~152; B: 203 contra 157; R: 83 contra 29). Nenhum limiar separa os dois grupos, então
 o "sem" medido NÃO equivale a "sem vazamento". Use o resultado na amostra C para decidir, não a intenção do nome.
@@ -37,13 +42,25 @@ from .descritores import PREFIXO, parametros as parametros_descritores
 CANAIS = ["R", "G", "B"]
 CAMINHOS = ("cl", "c0")
 PAPEIS_PROIBIDOS = {"meta", "alvo"}
+DIAGNOSTICOS = ("ok", "r2", "rmse", "inicio_s", "fim_s", "n_pontos")
+_RE_DIAGNOSTICO = re.compile(rf"^[RGB]_(?:{'|'.join((*CAMINHOS, PREFIXO))})_(?:{'|'.join(DIAGNOSTICOS)})$")
+
+
+def eh_diagnostico(coluna: str) -> bool:
+    """True para as colunas que descrevem o ajuste/janela (não o pó): <canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos}."""
+    return bool(_RE_DIAGNOSTICO.match(coluna))
+
+
+def colunas_de_diagnostico(colunas) -> list[str]:
+    """Diagnósticos presentes em `colunas`, para controle de qualidade e pesos (nunca entrada com o padrão)."""
+    return [c for c in colunas if eh_diagnostico(c)]
 
 
 def parametros(cfg: dict) -> dict:
     p = {"canais_sem_po": True, "limiar_inicio_corr": None, "caminhos": ["cl", "c0"],
-         "descritores": False, "descritores_sem_nao_confiaveis_R": False}
+         "descritores": False, "descritores_sem_nao_confiaveis_R": False, "bloquear_diagnosticos": True}
     p.update(cfg.get("entradas", {}) or {})
-    for chave in ("descritores", "descritores_sem_nao_confiaveis_R"):
+    for chave in ("descritores", "descritores_sem_nao_confiaveis_R", "bloquear_diagnosticos"):
         if not isinstance(p[chave], bool):
             raise ValueError(f"entradas.{chave} deve ser true ou false")
     if not set(p["caminhos"]) <= set(CAMINHOS) or not p["caminhos"]:
@@ -60,6 +77,8 @@ def colunas_de_entrada(dic: pd.DataFrame, p: dict) -> list[str]:
         c = r["coluna"]
         if r["papel"] in PAPEIS_PROIBIDOS or c.startswith("canal_ativo_") or c == "excluido_saturacao" or c == "sat_ate_s" or c.startswith("usar_no_ajuste_"):
             continue
+        if p.get("bloquear_diagnosticos", True) and eh_diagnostico(c):
+            continue
         m = re.match(r"^[RGB]_(cl|c0)_", c)
         if m and m.group(1) not in p["caminhos"]:          # também as flags *_ok do caminho que ficou de fora
             continue
@@ -74,7 +93,8 @@ def colunas_de_descritores(dic_desc: pd.DataFrame, cfg: dict) -> list[str]:
     cols = []
     for _, r in dic_desc.iterrows():
         c = r["coluna"]
-        if r["papel"] in PAPEIS_PROIBIDOS or r["papel"] == "meta" or c.startswith(("prop_", "canal_ativo_")) or c in fora:
+        if r["papel"] in PAPEIS_PROIBIDOS or r["papel"] == "meta" or c.startswith(("prop_", "canal_ativo_")) or c in fora \
+                or (p["bloquear_diagnosticos"] and eh_diagnostico(c)):
             continue
         cols.append(c)
     return cols

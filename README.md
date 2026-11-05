@@ -1,6 +1,6 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.12.0).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.16.4; 272 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
 
 ## Objetivo
 
@@ -379,7 +379,7 @@ Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `sci
 - **Tempo irregular:** os quadros novos chegam a intervalos de 0,067, 0,133 ou 0,2 s (o `tempo_s` vem do índice do contêiner). Avaliar o efeito no ajuste.
 - **Modelo:** a exponencial dupla venceu a simples em 649 dos 651 ajustes principais (a simples preferida quase nunca atinge R² ≥ 0,99). **Novo (6c):** com C = 0, a lei de potência (3 parâmetros) vence a dupla (4) em B e empata em G; o resíduo da dupla tem estrutura (6 a 19x o ruído). Decidido em 03/11/2026 (P1a): fica só como comparação. A v0.10.0 mostrou que a vantagem da potência com C livre vinha de C negativo (ver 6c); com C = 0 ela ainda vence em B.
 - **Decisões de 03/11/2026 (P1 a P3):** P1(a) a lei de potência continua só como comparação (sem caminho `pot`, o principal não muda); P2: limite no C livre (implementado com C >= 0, **o escopo real era bem maior que os 3 vídeos**; a Q1 fixou **-1,35**, ver 6a); P3(b) descritores sem modelo em tabela paralela (6d). **P4 feita na v0.11.0** (gráficos 5 a 7), **P5 feita na v0.11.2** (teste do offset cantos/ROI). Aprovada mas **ainda não feita**: P6 (comando `tudo` e relatórios de regressão). Q1, Q2 e Q5 resolvidas na v0.11.0; **Q3 resolvida na v0.11.1** (descritores ligados ao `entradas.py`, chave desligada por padrão); Q4 (próximo lote) em andamento.
-- **Decisões de 02/11/2026 (D1 a D6):** D1 tau dos canais sem o pó entra, com chave para desligar (ver "Entradas da IA": a chave só pode ser uma regra medida); D2 os 9 vídeos saturados ficam fora do treino principal, com ajuste à parte só para análise; D3 modelos extras só para comparação; D4 gráficos na ordem 1 a 4; D5 gama só como sensibilidade; D6 `C/1/RGB_05_05_05_v1a` fica de fora até o fim do projeto.
+- **Decisões de 02/11/2026 (D-pipeline 1 a 6; não confundir com D1–D6 do protocolo de 04/11, em `docs/protocolo_validacao.md`):** D1 tau dos canais sem o pó entra, com chave para desligar (ver "Entradas da IA": a chave só pode ser uma regra medida); D2 os 9 vídeos saturados ficam fora do treino principal, com ajuste à parte só para análise; D3 modelos extras só para comparação; D4 gráficos na ordem 1 a 4; D5 gama só como sensibilidade; D6 `C/1/RGB_05_05_05_v1a` fica de fora até o fim do projeto.
 - **Riscos novos (v0.9.0):** (1) o tau depende da janela e do C, e a potência sugere que não existe um tau intrínseco: declarar sempre a janela e o C ao comparar com outros estudos; (2) `cl` e `c0` são muito correlacionados, treinar com os dois pode favorecer sobreajuste (comparar na amostra C); com `c_livre_c_minimo: 0` isso piora no R (47% de cópias); (3) a sensibilidade de gama não melhora a repetibilidade e depende do processamento da câmera; (4) em 3 vídeos do R (amostra A: `GB_075_075_v1a`, `GB_1_05_v1a`, `RB_05_1_v3a`) o ajuste de C livre dava tau de 80 a 120 s com C de -23 a -33 níveis (sem sentido físico): **tratado na v0.10.0 com `c_livre_c_minimo`** (ver 6a); com o limite em 0, porém, 47% dos `R_cl_*` viram cópia de `R_c0_*` (por isso a Q1 adotou -1,35: 3% colados); (5) o "sem vazamento" de D1 não é separável por nível de sinal (ver acima); (6) **v0.11.0:** o tau `cl` dos 6 sinais do R colados em C = -1,35 depende do limite (6a); (7) a razão do 1/I no gráfico 7 depende de C, da janela e do zero do tempo; (8) **v0.11.2 (P5):** o offset cantos/ROI não é constante em todos os vídeos (`R_15_v4b` erra +2,0 níveis no B) e 53 vídeos têm o canto do B no piso mínimo da extração.
 - Limites de "suspeito" da ROI, calibrados com os 240 vídeos atuais (nenhum suspeito).
 - Se a checagem de sincronização, no futuro, poderá realinhar o tempo (por padrão, não realinha).
@@ -504,3 +504,122 @@ Política do usuário: alertas menores da auditoria podem ser aprovados, desde q
 | `A/2/RG_1_05_v2a` | 58,5 s (faltam ~1,5 s) | Cauda um pouco mais curta | Incluído |
 
 Pendente: `C/1/RGB_05_05_05_v1a` (pasta C, nome diz A; provavelmente é da amostra A, não confirmado). Se for A, repete o nome de `A/1/RGB_05_05_05_v1a`. Fica fora do dataset até decidir.
+
+<!-- trechos-incorporados-2026-11-04 -->
+# Blocos 1 e 2 e decisões de 04/11/2026 (incorporado dos README_trecho_*.md)
+
+Registro único de decisões: `docs/DECISOES.md`. Histórico de versões: `CHANGELOG.md`.
+
+### Decisões D1 a D6 e E1 (04/11/2026) e bloqueio dos diagnósticos (E1)
+
+Decididas: D1 (regressão das 3 frações), D3 (dois níveis: ≤ 70% mínimo e ≤ 50% forte do erro da média, mais as condições (b) e (c)), D4 (`c0` + descritores, com ênfase em razões entre canais, `t50`, `r_5s`, `auc_10s`), D5 (saturados fora, a rever) e E1. Provisórias, para confirmar com o orientador: D2 (validação) e D6 (limite de 1 preparação de validação). Texto completo em `docs/protocolo_validacao.md`.
+
+**E1 (código).** `entradas.bloquear_diagnosticos` (padrão **true**) tira de entrada `<canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos}` (função `eh_diagnostico`); `colunas_de_diagnostico(colunas)` lista essas colunas para controle de qualidade e pesos. O dataset e os descritores **não mudam**. `false` = variante exploratória declarada. A ausência de ajuste continua visível como NaN. Testes: `tests/test_entradas_diagnosticos.py` (novo) e 3 asserções ajustadas em `tests/test_entradas.py`.
+Riscos: (1) um diagnóstico útil só seria descoberto como variante declarada; (2) pesos por qualidade podem favorecer proporções brilhantes (checar antes de usar); (3) `sinal_presente_*` e `inicio_corr_*` continuam entradas permitidas: são medidas de sinal, não da janela.
+
+## Bloco 1: infraestrutura de avaliação (sem IA) — v0.16.1
+
+Nenhum modelo, nenhuma leitura de C. Comandos novos: `luminescencia avaliar_base` (saída em `output/avaliacao/`) e `luminescencia preregistrar` (grava `docs/preregistro.json` e `.md`). Módulos: `avaliacao.py`, `linhas_base.py`, `preregistro.py`; seções `avaliacao`, `linhas_base` e `preregistro` acrescentadas ao fim do `config.yaml` (nenhuma chave existente mudou).
+
+### Decisões
+- **Unidade = preparação.** O erro de cada preparação é a média dos seus vídeos; MAE, pior proporção, bootstrap e ganho pareado contam cada preparação uma vez (nunca o vídeo). IC 95% = percentil de 5000 reamostragens de preparações, semente fixa em `avaliacao.semente`.
+- **Dobras** (`gerar_dobras` já confere vazamento e levanta `VazamentoDeDobras`): A↔B, leave-one-proporção-out e por preparação; só A+B sem os 9 saturados; os índices são posições da tabela passada. `G0.5_B1` aparece como "sem treino" em A→B.
+- **Trava do C:** `avaliacao.abrir_c(cfg)` é a única função que devolve linhas de C; chama `verificar_preregistro`, que recusa (`RuntimeError`) sem `docs/preregistro.json` válido ou se mudar o hash de `dataset.csv`, `descritores.csv`, dos dois dicionários ou o conteúdo de qualquer seção do config listada no JSON. A lista de seções vale a do JSON (tirar uma seção da lista no config não destrava). Seções fora da lista (por exemplo `graficos`) podem mudar. `carregar_ab` nunca devolve C.
+- **Pré-registro:** as declarações (D2 provisória, D3, D4, sensibilidades) ficam em `preregistro.declaracoes` no config, então entram no hash. `preregistrar` recusa sobrescrever sem `--forcar`; com `--forcar` guarda o antigo como `preregistro_anterior_<data do antigo>.json/.md`.
+- **Linhas de base** (sem aprendizado): `media` (média das frações do treino da dobra) e regra fixa por `I0` (primária, piso de D3(c)) e por `auc_10s`: fração do canal ∝ grandeza, normalizada para somar 1. Canal com `sinal_presente_*` falso = 0 (R1.5); sinal presente com grandeza ausente ou negativa = vídeo sem previsão (não imputa; fica fora de TODAS as linhas e é listado em `sem_previsao.csv`). Nunca usa `prop_*`.
+- **Protocolo:** só a condição (c) de D3 foi reescrita (regra fixa em vez de k-vizinhos). O resto não foi tocado.
+- **Versão:** `__init__.py` estava em 0.16.0 e `pyproject.toml` em 0.13.0; subi os dois para 0.16.1 (suposição minha; ajuste se a versão base for outra).
+
+### Números medidos (só A+B, 148 vídeos em 31 preparações; 147 avaliados)
+MAE médio das 3 frações, A↔B (IC 95% por preparações):
+
+| | MAE | razão à média |
+|---|---|---|
+| média do treino | 0,2526 [0,216; 0,290] | 1 |
+| regra fixa I0 | 0,1851 [0,155; 0,214] | 0,733 [0,587; 0,897] |
+| regra fixa auc_10s | 0,2143 [0,179; 0,251] | 0,848 [0,705; 0,971] |
+
+- Leave-one-proporção-out: média 0,2697; regras iguais às de A↔B (não aprendem).
+- Ganho pareado por preparação (média − I0) em A↔B: 0,0675 [0,022; 0,114]; (média − auc_10s): 0,0383 [0,007; 0,080].
+- Sem `G0.5_B1`: I0 0,1888 (razão 0,745). Sem `R1.5`: I0 0,1979 (razão 0,824).
+- Pior proporção em A↔B: média `B1.5` (0,4535); I0 `G1.5` (0,3157).
+- 1 vídeo sem previsão: `B_15_v4b` (auc_10s do R ausente com sinal presente).
+
+### Riscos e o que a medição mostra
+- **O piso já é forte:** a regra fixa por `I0` já fica em 73% do erro da média em A↔B, perto do nível mínimo de D3(a) (≤ 70%). Um modelo precisa passar de 70% e ainda ganhar da regra.
+- **A regra não é uniformemente melhor que a média:** é pior em 5 das 16 proporções em A↔B (`R0.5_B1`, `R0.5_G0.5_B0.5`, `R0.75_B0.75`, `R1_B0.5`, `R1_G0.25_B0.25`). Esse resultado é só descritivo; o critério D3(b) é sobre o modelo.
+- **D3(b) e `R0.5_G0.5_B0.5`:** a composição central (1/3, 1/3, 1/3) fica perto da média, e o erro da média nela é 0,011. "Nenhuma proporção pior que a média" exige um modelo com erro desse tamanho ali. Decisão do Pedro/orientador; não alterei o critério.
+- **`R1.5` dá erro 0 na regra fixa** porque `sinal_presente_G/B` é falso (medido, não vem de `prop_*`). É ganho estrutural, por isso a sensibilidade "sem R1.5".
+- A média do treino é por vídeo (não ponderada por preparação); com 4 a 5 regravações por preparação a diferença é pequena, mas existe.
+- n efetivo é 31 preparações (29 com os 3 canais); os IC são largos.
+- §3 do protocolo ainda cita k-vizinhos como base (ii) e o quadro D3 não foi mexido, por instrução; ficou inconsistente com (c) até você decidir.
+- Não verificado aqui: `pytest` real, `tudo --so-conferir`, e o `descritores.py` real (usei um stub só com `PREFIXO`). Rode os comandos abaixo antes de aceitar.
+
+### Comandos
+`pytest -q -rs` (esperado: os 129 anteriores + 48 novos) · `luminescencia avaliar_base` · `luminescencia tudo --so-conferir` (deve continuar tudo OK) · depois de conferir o resultado e os itens de `preregistro.declaracoes`: `luminescencia preregistrar`.
+
+## B13 só com A+B (v0.16.2, `colinearidade --so-treino`)
+
+**O que mudou no código.** `colinearidade.amostras` (padrão `null` = todas as linhas, comportamento original) e a flag `--so-treino`: usa `divisao.treino` (A+B), tira os vídeos `excluido_saturacao` (D5), grava em `output/colinearidade_AB/` e compara com `output/colinearidade/` em `comparacao_com_base.txt` (calculada dos CSVs gravados). `amostras` na config sem a flag filtra só por amostra (saturados mantidos) e grava em `output/colinearidade_<amostras>/`, nunca em cima da pasta padrão. Os conjuntos mínimos são só **propostos**; nada foi aplicado.
+
+**Números medidos (dataset.csv e descritores.csv reais, `config.yaml` atual, VIF ≤ 10 salvo indicação).**
+- Linhas: 148 vídeos de 236 = 31 preparações. Os 9 saturados são 5 de A e 4 de B (nenhum em C); tirá-los não muda nenhum conjunto mínimo.
+- Colunas analisadas: 80 nas duas análises (nenhuma entrou ou saiu). Linhas completas no grupo `todas`: 188 → 123.
+- Dimensões efetivas (95%): R 5 → 4; G 4 → 4; B 3 → 3; razões 2 → 2; todas 8 → 8.
+- Pares |r| > 0,95 (`todas|sem_diag`): 268 → 275 (30 só em A+B, 23 só nas 236). Por canal: R 29 → 26, G 39 → 37, B 132 → 140, razões 2 → 2.
+- `so_descritores`: **igual** (B_md_I0, G_md_I0, R_md_I0, R_md_r_5s).
+- `so_tau`: 236 = B_c0_tau_medio, G_c0_tau_medio, G_cl_tau_medio, R_c0_tau_medio; A+B **acrescenta** B_cl_tau_medio (5 colunas).
+- `misto`: 236 = B_md_I0, G_c0_tau_medio, G_md_I0, R_c0_tau_medio, R_md_I0, R_md_r_5s; A+B **tira** B_md_I0 e **acrescenta** B_c0_tau_medio e B_cl_tau_medio (7 colunas).
+- Folgado (VIF ≤ 30): `so_descritores` igual; `so_tau` perde R_cl_tau1 (13 → 12); `misto` 13 → 9 (perde B_c0_fracao_rapida, B_cl_fracao_rapida, B_md_I0, G_c0_fracao_rapida, R_cl_tau1; ganha B_cl_tau_medio).
+- Tudo muda no canal B (mais redundante); R e G só mudam pares individuais. Lista completa dos pares e conjuntos: `comparacao_com_base.txt`.
+
+**A base das 236 linhas foi regenerada com o código/config atuais.** O `relatorio_colinearidade.txt` enviado é anterior ao E1 (`bloquear_diagnosticos: true`): tinha 123 candidatas e 35 diagnósticos; hoje são 84 candidatas. Os conjuntos mínimos das 236 linhas saem **idênticos** aos do relatório antigo (só as contagens de colunas/dimensões/pares diferem). Antes de rodar `--so-treino`, rode `luminescencia colinearidade` para que `output/colinearidade/` seja da versão atual.
+
+**Riscos.** Com 31 preparações, a poda por |r| e VIF é instável: B_cl_tau_medio e B_c0_tau_medio entram/saem por poucos pontos, e os conjuntos devem ser tratados como candidatos, não como decisão. A seleção usa só colunas de entrada (sem o alvo), então não há vazamento do alvo, mas o conjunto escolhido em A+B ainda não foi validado em C (que fica para o fim, uma vez).
+
+**Linhas completas e preparações por conjunto (copiado de output/colinearidade_AB/relatorio_colinearidade.txt):**
+- treino A, B: 138 vídeos = 29 preparações (proporção x amostra) -> 0.14 colunas por preparação
+- treino A, B: 138 vídeos = 29 preparações (proporção x amostra) -> 0.17 colunas por preparação
+- treino A, B: 138 vídeos = 29 preparações (proporção x amostra) -> 0.24 colunas por preparação
+
+## Qualidade e viés dos diagnósticos (v0.16.3, `luminescencia qualidade`)
+
+**O que faz.** Só análise; nenhum peso é aplicado em nenhuma tabela. Lê `output/tabela/dataset.csv` e `descritores.csv`, usa só treino (A+B) sem os 9 saturados (a amostra C nunca é aberta) e mede, por diagnóstico (`*_{ok,r2,rmse,inicio_s,fim_s,n_pontos}`, 39 colunas dos caminhos cl, c0 e md): distribuição por proporção e por amostra, η² da proporção e da amostra, e vídeos candidatos a baixo peso. Saída em `output/qualidade/`: `relatorio_qualidade.txt`, `diagnosticos_eta2.csv`, `distribuicao_por_proporcao.csv`, `distribuicao_por_amostra.csv`, `candidatos_baixo_peso.csv`, `candidatos_resumo.csv`.
+
+**Decisões de método.**
+- A permutação é no nível da **preparação** (proporção × amostra), nunca do vídeo: a proporção circula entre preparações e a amostra circula dentro da proporção. As regravações ficam juntas, como manda o protocolo.
+- O veredito usa o η² **ajustado** (observado − média sob permutação), porque o η² bruto sobe só por haver 16 grupos e correlação dentro da preparação. "Usável como peso": ajustado < `limite_eta2_prop`. "Viés": ajustado ≥ limite **e** p < `alfa`. Casos extras calculados: "inconclusivo" (≥ limite, mas p ≥ alfa), "sem variação" e "dados insuficientes".
+- A amostra é medida como variância adicional explicada depois da proporção (aviso de deriva de sessão).
+- Também se mede se a **ausência** do diagnóstico (canal sem ajuste) depende da proporção.
+- Candidato a baixo peso: estritamente pior que o quantil `quantil_baixo`; diagnóstico binário: o valor pior, se minoritário. O lado "melhor" de cada diagnóstico está em `qualidade.direcao` (**`inicio_s: menor` é suposição**).
+
+**Números medidos (CSVs reais, semente 20261104, 2000 permutações).** Base: 148 vídeos, 31 preparações, 16 proporções (os "138 vídeos" são os que têm todas as colunas de G e B; R e `ok` têm 148). Dos 39 diagnósticos: 22 "viés", 8 "usável como peso", 9 "sem variação", 0 "inconclusivo". Usáveis: só `fim_s` e `n_pontos` de G e B (cl e c0), com η² ajustado entre −0,02 e −0,01. Nenhum diagnóstico do R é usável. `r2` e `rmse` de todos os canais são viés (η² ajustado de 0,10 a 0,37). Os `ok` de G e B (cl, c0, md) saem como viés (ajustado 0,49): o ajuste existe conforme a composição. Nenhum diagnóstico depende da amostra depois da proporção. Os candidatos dos 8 usáveis são poucos (1 a 3 vídeos, 1 a 3 preparações, nenhuma com maioria de vídeos candidatos); os dos diagnósticos com viés são em mediana 14 vídeos.
+
+**Riscos.**
+- Com 2 preparações por proporção (A e B), o poder da permutação é limitado.
+- "Usável" só diz que o diagnóstico não depende da proporção; **não** prova que o peso melhore a predição (isso exige ganho em validação cruzada agrupada).
+- G e B usáveis têm ausência dependente da proporção (n = 138, não 148), então o peso ficaria indefinido nas proporções sem aquele canal.
+- Limiares (0,10; alfa 0,05; quantil 0,10) são provisórios: o orientador confirma.
+- `fim_s` e `n_pontos` iguais em R cl e c0 e η² quase idênticos indicam janela definida por regra comum; não foi investigada a causa.
+
+## Bloco 2C: simulação do IC do erro em C e plano da 2ª preparação (v0.16.4)
+
+**Novo:** `luminescencia ic_simulacao` (módulo `ic_simulacao.py`, seção `ic_simulacao` do `config.yaml`, saída em `output/ic_simulacao/`: `relatorio_ic_simulacao.txt`, `ic_simulacao.csv`, `ic_componentes.csv`). Só análise; lê `output/deriva/`; não toca em `dataset.csv`, `descritores.csv`, `ajustes.csv`. Plano em `docs/plano_segunda_preparacao.md`.
+
+**Decisões.** Erro escalar por composição i e preparação p: `e = d_i + S_p + U_ip + R_ip/sqrt(n_reg)`, normais independentes. Variâncias proporcionais às frações medidas em `deriva_variancia.csv` (entre proporções, entre amostras x deslocamento comum, entre amostras x resto, entre regravações) nas grandezas da D4 (razao_I0, razao_t50, t50, r_5s, auc_10s); escala calibrada para E|e| = MAE verdadeiro m da grade. Largura do IC = quantis 2,5/97,5% de (MAE observado − MAE verdadeiro da grade da réplica, folded normal exata). 20 000 réplicas, semente 12345.
+
+**Medido (config padrão, rodado nos CSVs reais de `deriva`).**
+- MAE da média calculado da grade (16 composições, f = prop/1,5): 0,2500 (o protocolo cita 0,255 medido em C com a média do treino; a diferença não foi investigada). Limites: 0,1750 (70%) e 0,1250 (50%).
+- Frações (mediana / p75 entre 15 linhas): entre proporções 0,873 / 0,815; entre amostras 0,043 / 0,088; entre regravações 0,084 / 0,098; deslocamento comum 0,131 / 0,278. CV entre regravações 0,032; diferença relativa entre amostras 0,065.
+- Largura do IC 95% do MAE (cenário mediana), m = 0,125: 0,036 (1 prep), 0,0255 (2), 0,0207 (3); a razão 3/1 é 0,58 (0,57 no p75) e não depende de m. m = 0,10 no p75: 0,038 / 0,027 / 0,022.
+- Passar por sorte (m acima do limite, 1 preparação): nível mínimo até 0,259 (m = 0,20); nível forte até 0,188 (m = 0,15); com 3 preparações 0,250 e 0,176.
+- A chance de passar (a) e (b) juntos deu 0,000 em toda a grade: o erro da média na composição R0.5_G0.5_B0.5 é 0,000 (a média das frações coincide com ela), então (b) só passa com erro nulo nela.
+
+**Riscos e o que não foi verificado.**
+1. A repartição do erro segundo as frações de variância dos descritores é suposição, não medida no erro de um modelo (não há modelo). O resultado vale só dentro dela.
+2. O erro escalar substitui o erro por fração (R, G, B); a condição (c) não é simulada.
+3. `frac_offset_comum` foi lido como parte da variância entre amostras (nota do `relatorio_deriva.txt`).
+4. Os testes novos foram executados aqui sem `pytest` (executor mínimo equivalente, 10 testes OK) e só com o módulo isolado; a suíte completa (241 testes), o registro no `cli.py` (só conferida a sintaxe) e `tudo --so-conferir` **não** foram rodados.
+5. O (b) com erro da média 0 na composição central pode ser inatingível: levar ao orientador como ajuste do protocolo (tolerância ou excluir essa composição de (b)). Não foi alterado nada no protocolo.
+6. D6 e D2 seguem provisórias.
+
