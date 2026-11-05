@@ -2,6 +2,11 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [docs] — 2026-11-04 (verificação completa da v0.19.0)
+- `scripts/anomalias_amostras.py`: seções 8 a 14 (o que sobra depois da correção da luz, I0 por sessão, ausentes e modelos por sessão, duplicatas, assinatura de decaimento, ordem das regravações depois da correção).
+- README: itens 9 a 15 de "Anomalias entre amostras" e a pendência 3 (arredondamento do canto) no topo; guia e DECISOES atualizados.
+- Proposta (não aplicada): `propostas/01_canto_sem_arredondamento.diff`.
+
 ## [0.19.0] — 2026-11-04
 - `entradas.corrigir_luz: true` no `config.yaml` (decisão do Pedro; aguarda o orientador). Padrão do código continua `false`.
 - `luz.separacao_cruzada`: separação entre composições sem e com a correção, cruzada A↔B; `output/luz/separacao.csv` e seção no relatório.

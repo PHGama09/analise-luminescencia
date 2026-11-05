@@ -1,5 +1,6 @@
 """Testes da consolidação: quem entra, correção do preto, nomes aprovados. Rode: pytest"""
 import numpy as np
+import pytest
 import pandas as pd
 
 from luminescencia.consolidacao import avaliar_correcao, corrigir_preto, selecionar
@@ -89,7 +90,7 @@ def _quadros(canto_b, n=200, segunda_metade=None):
 
 def test_canto_acima_do_piso_fica_igual():
     r = canto_do_video(_quadros(2.345), 0.5, 1.0, P_CANTO)
-    assert r["R"] == (2.0, "canto") and r["B"] == (2.35, "canto")
+    assert r["R"] == (2.0, "canto") and r["B"] == (pytest.approx(2.345), "canto")      # sem arredondar (v0.19.1)
 
 
 def test_canto_real_abaixo_do_piso_e_usado():
@@ -121,3 +122,10 @@ def test_sem_csv_mantem_o_valor_da_extracao(tmp_path):
     df = _df(100, 10, canto=1.0, ref=1.6).iloc[:1].assign(arquivo_csv="nao_existe.csv")
     novo = recalcular_cantos(df, tmp_path, 0.5, 1.0, P_CANTO)
     assert novo["piso_canto_B"].iloc[0] == 1.0 and novo["canto_fonte_B"].iloc[0] == "resumo (sem CSV)"
+
+
+def test_mediana_em_empate_nao_e_arredondada():
+    # achado de 04/11/2026: mediana de nº par de quadros em x,xx5 (ex.: 1,775) virava 1,77 numa máquina e 1,78 em outra
+    d = pd.DataFrame({"tempo_s": np.linspace(0.6, 60, 200), "canto_R": [1.77, 1.78] * 100, "canto_G": 2.0, "canto_B": [0.95, 0.96] * 100})
+    r = canto_do_video(d, 0.5, 1.0, P_CANTO)
+    assert r["R"][0] == pytest.approx(1.775, abs=1e-12) and r["B"] == (pytest.approx(0.955, abs=1e-12), "canto_abaixo_do_piso")

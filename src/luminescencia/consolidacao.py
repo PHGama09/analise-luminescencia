@@ -30,7 +30,10 @@ Canto sem o piso mínimo (consolidacao.canto_sem_piso, decisão de 04/11/2026)
       quadros    pelo menos canto_min_quadros quadros no decaimento;
       estável    |mediana da 1ª metade - mediana da 2ª metade| <= canto_max_variacao (um preto real não muda no vídeo);
       plausível  mediana >= canto_minimo_absoluto.
-  Canto acima do piso fica IGUAL ao da extração. O valor da extração continua em piso_canto_extracao_*.
+  O valor da extração continua em piso_canto_extracao_*.
+  O canto NÃO é arredondado (desde a verificação de 04/11/2026): os cantos quadro a quadro têm 2 casas e, com nº par de quadros,
+  a mediana cai muitas vezes em x,xx5; round(..., 2) decidia esses empates pela representação binária, que muda com a versão do
+  pandas/numpy e com a máquina (25 cantos diferiam entre duas máquinas, e um deles movia o fim da janela do R em 0,8 s).
 
 Conferência (no relatório): em cada grupo de mesma proporção e mesma amostra (5 regravações), compara a dispersão do nível
 final com o piso fixo e com o piso por vídeo, só nos canais cujo pó está presente. Se a correção funciona, a dispersão cai.
@@ -116,7 +119,7 @@ def canto_do_video(d: pd.DataFrame, corte: float, piso_minimo: float, p: dict) -
             continue
         med = float(x.median())
         if med >= piso_minimo:
-            saida[c] = (round(med, 2), "canto")
+            saida[c] = (med, "canto")
             continue
         t = dec.loc[x.index, "tempo_s"]
         a, b = x[t < meio], x[t >= meio]
@@ -128,7 +131,7 @@ def canto_do_video(d: pd.DataFrame, corte: float, piso_minimo: float, p: dict) -
             motivos.append(f"instável ({variacao:.2f})")
         if med < p["canto_minimo_absoluto"]:
             motivos.append(f"abaixo do mínimo absoluto ({med:.2f})")
-        saida[c] = (round(piso_minimo, 2), "piso_minimo: " + "; ".join(motivos)) if motivos else (round(med, 2), "canto_abaixo_do_piso")
+        saida[c] = (round(piso_minimo, 2), "piso_minimo: " + "; ".join(motivos)) if motivos else (med, "canto_abaixo_do_piso")
     return saida
 
 

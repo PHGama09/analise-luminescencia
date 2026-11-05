@@ -6,6 +6,8 @@
 > 1. **`RB_05_1_v1a` (amostra A, treino) parece ser de outra composição (`RG_05_1`).** Assistir ao vídeo e decidir no `curadoria.csv` (`incluir = nao` ou nome corrigido em `nome_aprovado`). Enquanto isso, ele **entra no dataset com um rótulo provavelmente errado**, porque está como `pendente` com auditoria `ok`.
 > 2. **Luz de fundo durante a gravação:** é o maior artefato conhecido da medição. A correção estatística (`luminescencia luz`) foi **ligada** na v0.19.0 (`entradas.corrigir_luz: true`, decisão do Pedro de 04/11/2026) porque, só em A↔B, aumenta a separação entre composições em 36 de 36 colunas. **Falta a confirmação do orientador antes do pré-registro.** O teste de luz acesa × apagada, que confirmaria a causa, continua pendente.
 
+> 3. **Reprodutibilidade entre máquinas (achado de 04/11/2026, correção proposta):** o canto do preto é arredondado a 2 casas e, em 25 cantos, a mediana cai exatamente em x,xx5. O arredondamento desses empates muda de máquina para máquina, e por isso a conferência de regressão dá 1 divergência no Windows contra a referência gravada no Linux. A correção (não arredondar o canto) está em `propostas/01_canto_sem_arredondamento.diff` e espera aprovação. Depois de aplicar, é preciso regravar a referência.
+
 > **Novo no projeto?** Comece por [`docs/GUIA_DO_PROJETO.md`](docs/GUIA_DO_PROJETO.md): explica em linguagem simples o que é o projeto, o glossário, o fluxo de trabalho e o porquê de cada funcionalidade. As decisões, com data, estão em [`docs/DECISOES.md`](docs/DECISOES.md).
 
 ## Objetivo
@@ -487,6 +489,26 @@ Hipótese (não testada): luz ambiente durante a gravação, refletida pelo pó 
 3. ~~Piso mínimo~~: **aplicado na v0.17.0** (item 4). Falta só regravar a referência de regressão.
 4. Declarar no protocolo que as regravações têm tendência com a ordem e que parte da "deriva de sessão" é luz de fundo.
 
+
+**Verificação completa de 04/11/2026 (v0.19.0): novas seções 8 a 14 do `scripts/anomalias_amostras.py`.**
+
+**9. A correção da luz funciona pior no C.** A correlação canto × `t50` dentro da preparação cai para perto de 0 em A e B, mas no C só diminui: R +0,65 → +0,46, G +0,40 → +0,22, B +0,59 → +0,35. A e B calibram a correção e o C só a recebe, então parte disso é esperada. Mesmo assim, o efeito da luz no C parece maior do que a inclinação estimada em A+B. **Isto não pode ser usado para recalibrar a correção** (seria ajustar ao C). Deve ser declarado como limite ao ler o resultado em C.
+
+**10. Sobra uma deriva pequena entre sessões.** Depois da correção, o `t50` do vermelho ainda fica +2,7% no A e −3,1% no C em relação à média da composição. No verde e no azul, a sobra é de 1% a 2,5%. Para comparação, o CV entre regravações é de cerca de 5%.
+
+**11. O C foi excitado com menos intensidade no vermelho.** Em relação à média da composição, o I0 do C é −5,2% no R (Kruskal p = 3·10⁻⁶), −1,4% no G e −0,7% no B; A e B ficam em torno de +2%. Isso não vem da luz de fundo, porque a inclinação do I0 com o canto é ≈ 1% por nível. Como o efeito é maior no vermelho, as razões de I0 mudam: R/G −2,8% e R/B −3,0% no C, contra +1,9% e +0,9% no A. Uma IA que use razões de I0 tende a ver **um pouco menos de vermelho no C** do que existe. Isso combina com o C não ter nenhum saturado (A 5, B 4). Causa possível, não testada: excitação mais fraca ou mais curta nessa sessão. **Declarar ao ler o erro do R em C.**
+
+**12. A ordem das regravações: o decaimento se explica, o brilho não.** A tendência do `t50` com a ordem das regravações **some** depois da correção da luz (R 23/46, B 21/43, sem tendência), então vinha da luz de fundo, que sobe ao longo das regravações. Já a queda do I0 continua: G positivo em só 13 de 43 (p = 0,014), R 16/46 e B 15/43 (p ≈ 0,06). As regravações posteriores são um pouco mais fracas, talvez por fadiga do pó ou aquecimento da lâmpada.
+
+**13. Outros pontos (sem problema ou só alerta):**
+- **Duplicatas:** nenhuma. Os 9 vídeos com valores "iguais" são os saturados, que não têm descritores.
+- **Escolha de modelo por sessão:** igual nas três (exponencial dupla em 212/210/227 ajustes; teste qui-quadrado p = 0,13). O modelo escolhido não identifica a sessão.
+- **Ausentes por sessão:** 5 colunas têm fração de ausentes diferente em mais de 5 p.p. entre amostras (por exemplo, `R_md_r_20s` 1%/5%/10% e `G_md_t10` 14%/15%/8%). Isso segue a física (o sinal some antes no C), mas a **presença ou ausência** dessas colunas pode identificar a sessão. As colunas prioritárias da D4 (`t50`, `r_5s`, `auc_10s`) não têm esse problema.
+- **Assinatura de decaimento:** 10 vídeos têm o padrão de `t50` mais perto de outra composição, mas esse sinal é fraco (composições com `t50` parecidos se confundem). O único caso que coincide com a assinatura de cor é o `RB_05_1_v1a`, o que reforça a pendência 1.
+
+**14. Reprodutibilidade entre máquinas (correção proposta).** Desde a v0.17.0, o canto é recalculado em cada máquina e arredondado a 2 casas. Em 25 cantos a mediana cai exatamente em x,xx5 e o empate é decidido pela representação binária, que muda com a versão do pandas. Resultado: 25 cantos diferem 0,01 entre o Windows do Pedro e o Linux da verificação, a conferência acusa 1 divergência (`final_corr_R`, 0,15%), e em `RB_075_075_v5b` o fim da janela do R muda 0,8 s. A proposta é não arredondar o canto. O preto muda no máximo 0,009 nível (mediana 0,003), e os 2 ajustes do B que tinham trocado de modelo na v0.17.0 voltam ao modelo de antes, o que mostra que estavam no limite. Aplicar com `git apply propostas/01_canto_sem_arredondamento.diff`; depois rodar `tudo` e regravar a referência.
+
+**15. Configuração a conferir antes do treino.** O pré-registro declara a variante primária D4 com descritores (`preregistro.declaracoes.variante_primaria.descritores: true`), mas `entradas.descritores` está `false` no config. Isso é coerente com o padrão Q3, e o `avaliar_base` liga os descritores por conta própria. Mas **o treino precisa usar a mesma variante declarada**: confirmar a chave antes de treinar.
 
 #### Correção da luz de fundo (`luminescencia luz`, `luz.py`, v0.18.0)
 

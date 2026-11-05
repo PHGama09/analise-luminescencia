@@ -325,6 +325,14 @@ pytest -q
 - medir o preto no anel em volta da amostra foi testado e rejeitado: a luz extra só aparece onde está o pó;
 - a luz de fundo sobe e o brilho do G cai ao longo das regravações.
 
+**Achados da verificação completa de 04/11/2026 (v0.19.0)** (README, itens 9 a 15):
+- a correção da luz funciona pior no C do que em A e B (declarar; nunca recalibrar com o C);
+- o C foi excitado com menos intensidade no vermelho (I0 −5,2%; razão R/G −2,8%): a IA pode ver "menos vermelho" no C;
+- a tendência do decaimento com a ordem das regravações vinha da luz e some com a correção; a queda do brilho (I0) continua;
+- sem duplicatas; a escolha de modelo é igual nas três sessões;
+- 25 cantos arredondados diferem entre máquinas: correção proposta em `propostas/01_canto_sem_arredondamento.diff`;
+- `entradas.descritores` precisa ser conferida contra a variante declarada no pré-registro antes do treino.
+
 **Pendências assumidas:** a deriva de sessão que sobra (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
 
 **Próximos passos, fora do escopo atual:** treinar a IA (k-vizinhos foi adiado), abrir C uma vez e, se o critério passar, a 2ª preparação de validação e o aplicativo.

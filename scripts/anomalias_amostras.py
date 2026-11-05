@@ -4,6 +4,10 @@ Uso (na raiz, venv ativo):  python scripts/anomalias_amostras.py
 Lê output/consolidacao/videos.csv, output/auditoria/relatorio_auditoria.csv, output/roi/roi.csv,
 output/tabela/dataset.csv e output/tabela/descritores.csv. Não grava nada e não altera nenhum arquivo.
 
+Seções 8 a 14 (verificação de 04/11/2026, v0.19.0): o que sobra depois da correção da luz (output/tabela/luz.csv), intensidade
+inicial por sessão, ausentes por sessão, escolha de modelo por sessão, duplicatas, assinatura de decaimento e ordem das regravações
+depois da correção.
+
 Cuidados: lê features e metadados de C (como o `deriva`), nunca desempenho em C. `prop_*` e a proporção só
 agrupam vídeos (mesma preparação), nunca viram entrada. Nada daqui deve ser usado para escolher entradas (B13).
 """
@@ -135,6 +139,108 @@ def destoantes(de):
         print("  nenhum")
 
 
+def _luz_e_sinal(ds, de):
+    lz = pd.read_csv("output/tabela/luz.csv", encoding=ENC)
+    x = (de[["video", "amostra", "proporcao"] + [c for c in de.columns if c.endswith(("_md_t50", "_md_auc_10s", "_md_I0"))]]
+         .merge(lz.rename(columns=lambda c: c if c in ("video", "canto_luz") else c + "_luz"), on="video")
+         .merge(ds[["video", "num_video", "excluido_saturacao"] + [f"sinal_presente_{c}" for c in CANAIS]], on="video"))
+    x = x[~x["excluido_saturacao"].astype(bool)].copy()
+    x["prep"] = x["proporcao"] + "|" + x["amostra"]
+    return x
+
+
+def pos_correcao(x):
+    print("\n== 8. Depois da correção da luz: canto x t50 dentro da preparação, por amostra (rho sem -> com)")
+    print("  (A e B calibram a correção; no C ela é só aplicada. Isto mede a medição, NUNCA serve para ajustar nada.)")
+    for c in CANAIS:
+        col = f"{c}_md_t50"
+        s = x[x[f"sinal_presente_{c}"].astype(bool)].dropna(subset=[col])
+        s = s[s.groupby("prep")["video"].transform("size") >= 3]
+        w = lambda v: v - v.groupby(s["prep"]).transform("mean")
+        r = {a: f"{spearmanr(w(s['canto_luz'])[s['amostra'] == a], w(np.log(s[col]))[s['amostra'] == a])[0]:+.2f} -> "
+                f"{spearmanr(w(s['canto_luz'])[s['amostra'] == a], w(np.log(s[col + '_luz']))[s['amostra'] == a])[0]:+.2f}" for a in "ABC"}
+        print(f"  {col}: {r}")
+    print("\n== 9. Deriva entre sessões que sobra (desvio mediano em relação à média da composição, %; sem -> com correção)")
+    for c in CANAIS:
+        for g in ("t50", "auc_10s"):
+            col = f"{c}_md_{g}"
+            s = x[x[f"sinal_presente_{c}"].astype(bool)].dropna(subset=[col])
+            f = lambda v: {a: round(float(np.expm1((v - v.groupby(s["proporcao"]).transform("mean"))[s["amostra"] == a].median()) * 100), 1) for a in "ABC"}
+            print(f"  {col:14s} {f(np.log(s[col]))} -> {f(np.log(s[col + '_luz']))}")
+
+
+def intensidade(ds, de):
+    print("\n== 10. Intensidade inicial (I0) por sessão, relativa à composição (%; só canais com sinal medido)")
+    s = de.merge(ds[["video", "excluido_saturacao"] + [f"sinal_presente_{c}" for c in CANAIS]], on="video")
+    s = s[~s["excluido_saturacao"].astype(bool)]
+    for c in CANAIS:
+        t = s[s[f"sinal_presente_{c}"].astype(bool)].dropna(subset=[f"{c}_md_I0"])
+        r = np.log(t[f"{c}_md_I0"]) - np.log(t[f"{c}_md_I0"]).groupby(t["proporcao"]).transform("mean")
+        print(f"  {c}_md_I0: {dict((a, round(float(np.expm1(r[t['amostra'] == a].median()) * 100), 1)) for a in 'ABC')} "
+              f"(Kruskal p={kruskal(*[r[t['amostra'] == a] for a in 'ABC']).pvalue:.1e})")
+    for col in ("razao_I0_R_G", "razao_I0_R_B", "razao_I0_G_B"):
+        t = s.dropna(subset=[col])
+        t = t[t[col] > 0]
+        r = np.log(t[col]) - np.log(t[col]).groupby(t["proporcao"]).transform("mean")
+        print(f"  {col}: {dict((a, round(float(np.expm1(r[t['amostra'] == a].median()) * 100), 1)) for a in 'ABC')}")
+    print("  saturados por amostra:", ds[ds["excluido_saturacao"].astype(bool)].groupby("amostra").size().to_dict())
+
+
+def ausentes_e_modelos(ds):
+    print("\n== 11. Ausentes por sessão nas colunas de entrada (descritores ligados) e escolha de modelo por sessão")
+    import yaml
+
+    from luminescencia import entradas as en
+    cfg = yaml.safe_load(open("config.yaml", encoding="utf-8"))
+    cfg["entradas"]["descritores"] = True
+    ent = en.carregar_entradas(cfg)
+    ent["amostra"] = ds["amostra"].to_numpy()
+    ent = ent[~ds["excluido_saturacao"].astype(bool).to_numpy()]
+    na = ent.drop(columns=["amostra"]).isna().groupby(ent["amostra"]).mean()
+    dif = (na.max() - na.min()).sort_values(ascending=False)
+    dif = dif[dif > 0.05]
+    print(f"  {len(dif)} colunas com fração de ausentes diferente em mais de 5 p.p. entre amostras:",
+          {k: na[k].round(2).to_dict() for k in dif.index})
+    aj = pd.read_csv("output/modelagem/ajustes.csv", encoding=ENC, low_memory=False)
+    for cam in ("principal", "c_livre"):
+        print(f"  modelos ({cam}):", pd.crosstab(aj[aj["caminho"] == cam]["amostra"], aj[aj["caminho"] == cam]["modelo"]).to_dict("index"))
+
+
+def duplicatas(de):
+    print("\n== 12. Duplicatas: vídeos com I0 e t50 idênticos nos 3 canais (ignorando os sem descritores)")
+    k = de.set_index("video")[[f"{c}_md_{g}" for c in CANAIS for g in ("I0", "t50")]].round(3)
+    k = k[k.notna().any(axis=1)].fillna(-1)
+    d = k[k.duplicated(keep=False)]
+    print("  ", sorted(d.index) if len(d) else "nenhuma")
+
+
+def assinatura_decaimento(ds):
+    print("\n== 13. Assinatura de DECAIMENTO (t50 corrigido nos canais com sinal) que bate melhor com outra composição")
+    lz = pd.read_csv("output/tabela/luz.csv", encoding=ENC).set_index("video")
+    lab = ds.set_index("video")["proporcao"]
+    sp = ds.set_index("video")[[f"sinal_presente_{c}" for c in CANAIS]].astype(bool)
+    lg = np.log(lz[[f"{c}_md_t50" for c in CANAIS]].where(sp.loc[lz.index].to_numpy()))
+    med = lg.join(lab).groupby("proporcao").median()
+    achados = []
+    for vid, row in lg.iterrows():
+        if row.isna().all() or vid not in lab.index:
+            continue
+        d = ((med - row) ** 2).mean(axis=1, skipna=True).dropna()
+        if lab[vid] in d and d.idxmin() != lab[vid] and d[lab[vid]] > 4 * d.min() and d[lab[vid]] > 0.01:
+            achados.append(vid)
+            print(f"  {vid}: rotulado {lab[vid]}, mais perto de {d.idxmin()} ({d.min():.4f} contra {d[lab[vid]]:.4f})")
+    print(f"  total {len(achados)} (sinal fraco: composições com t50 parecidos se confundem; vale como alerta quando coincide com a seção 6)")
+
+
+def ordem_pos_correcao(x):
+    print("\n== 14. Ordem das regravações DEPOIS da correção: t50 corrigido e I0, tendência dentro da preparação")
+    for col in [f"{c}_md_t50_luz" for c in CANAIS] + [f"{c}_md_I0" for c in CANAIS]:
+        c = col[0]
+        r = pd.Series([spearmanr(g["num_video"], g[col])[0] for _, g in x[x[f"sinal_presente_{c}"].astype(bool)].groupby("prep")
+                       if g[col].notna().sum() >= 4]).dropna()
+        print(f"  {col:14s} rho mediano {r.median():+.2f}, positivo em {(r > 0).sum()}/{len(r)} (p={binomtest(int((r > 0).sum()), len(r)).pvalue:.1e})")
+
+
 def main():
     v, de, x = ler()
     aquisicao(v)
@@ -144,6 +250,14 @@ def main():
     piso_minimo(v, x)
     destoantes(de)
     vazamento(v)
+    ds = pd.read_csv("output/tabela/dataset.csv", encoding=ENC, low_memory=False)
+    xl = _luz_e_sinal(ds, de)
+    pos_correcao(xl)
+    intensidade(ds, de)
+    ausentes_e_modelos(ds)
+    duplicatas(de)
+    assinatura_decaimento(ds)
+    ordem_pos_correcao(xl)
 
 
 if __name__ == "__main__":
