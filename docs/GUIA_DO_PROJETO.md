@@ -2,7 +2,7 @@
 
 Este guia é para quem nunca viu o projeto: o orientador, um colega, uma banca ou você daqui a seis meses. Não é preciso saber programar para entender as seções 1 a 3. As seções 4 e 5 descrevem cada parte do código. Detalhes técnicos e números estão no `README.md`; as decisões, com data, em `docs/DECISOES.md`.
 
-Versão do código descrita: **0.19.0** (04/11/2026), com 295 testes automáticos.
+Versão do código descrita: **0.20.0** (05/11/2026), com 305 testes automáticos. Análise final em 05/11/2026.
 
 ---
 
@@ -230,6 +230,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 - **Papel:** decide quais colunas a IA pode ver.
 - **Objetivo:** bloquear a identificação, a resposta (`prop_*`), tudo o que vem dela (`canal_ativo_*`, `usar_no_ajuste_*`, marcações de saturação) e os diagnósticos do ajuste (decisão E1). Decidir quais canais entram usa só regras **medidas** no vídeo.
 - **Entrega:** as funções `colunas_de_entrada`, `montar_entradas` e `carregar_entradas`, usadas por todas as análises e pela avaliação.
+- **Proteções extras (v0.20.0):** `max_ausentes_treino` (ligada) tira as colunas com mais de 10% de ausentes no treino, para que "coluna vazia" não vire pista de sessão; `sem_intensidade` (desligada, para usar como sensibilidade) tira as colunas em unidade de intensidade, que mudam com a força da excitação de cada sessão; `corrigir_luz` (ligada) usa as formas do decaimento corrigidas da luz de fundo.
 
 #### Avaliação (`avaliacao.py`, sem comando)
 - **Por que existe:** para definir, antes de qualquer IA, **como** ela será julgada.
@@ -328,11 +329,19 @@ pytest -q
 **Achados da verificação completa de 04/11/2026 (v0.19.0)** (README, itens 9 a 15):
 - a correção da luz funciona pior no C do que em A e B (declarar; nunca recalibrar com o C);
 - o C foi excitado com menos intensidade no vermelho (I0 −5,2%; razão R/G −2,8%): a IA pode ver "menos vermelho" no C;
-- a tendência do decaimento com a ordem das regravações vinha da luz e some com a correção; a queda do brilho (I0) continua;
+- a tendência do decaimento com a ordem das regravações vinha da luz e some com a correção; a queda do brilho (I0) continua, mas se cancela nas razões entre canais (confirmado);
+- proteções novas nas entradas: colunas com ausentes demais no treino saem (ligada) e as de intensidade podem sair (chave de sensibilidade);
+- separar vazamento e pó no vermelho foi testado e rejeitado (não melhora o teste cruzado);
 - sem duplicatas; a escolha de modelo é igual nas três sessões;
-- 25 cantos arredondados diferem entre máquinas: correção proposta em `propostas/01_canto_sem_arredondamento.diff`;
+- 25 cantos arredondados diferiam entre máquinas: corrigido no commit `50c206e` (o canto não é mais arredondado);
 - `entradas.descritores` precisa ser conferida contra a variante declarada no pré-registro antes do treino.
 
 **Pendências assumidas:** a deriva de sessão que sobra (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
 
 **Próximos passos, fora do escopo atual:** treinar a IA (k-vizinhos foi adiado), abrir C uma vez e, se o critério passar, a 2ª preparação de validação e o aplicativo.
+
+---
+
+## 9. O que não se resolve em código
+
+Alguns problemas estão nos dados ou na forma como os vídeos foram gravados (luz de fundo, excitação diferente entre sessões, vazamento de cor da câmera, poucos dados), e não no código. O código já reduz o que dá para reduzir. A lista completa, com a mitigação aplicada, o que foi testado e o que resolveria cada item, está no `README.md`, seção "Limites que não se resolvem em código".
