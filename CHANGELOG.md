@@ -4,6 +4,7 @@ Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada
 
 ## [não lançado] — 2026-11-04 (só documentação)
 - `docs/GUIA_DO_PROJETO.md`: guia em linguagem simples (glossário, fluxo, cada funcionalidade).
+- `scripts/anomalias_amostras.py` e seção "Anomalias entre amostras" no README: possível rótulo trocado em `RB_05_1_v1a`, luz nos cantos x decaimento, canto preso no piso mínimo, tendência com a ordem das regravações.
 - README: seção "B5: deriva de sessão e a amostra C" (o C destoa mais quando há deriva e apaga um pouco mais rápido; cuidados).
 - README: ponteiro para o guia, fluxo em 4 fases, todos os comandos, árvore do repositório atualizada.
 

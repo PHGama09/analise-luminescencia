@@ -186,7 +186,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 - **Pergunta:** A, B e C diferem de forma sistemática, a ponto de a IA aprender a sessão em vez da composição?
 - **Como responde:** compara, por composição e canal, as médias de cada amostra, a variação entre regravações e testes estatísticos para amostras pequenas, e decompõe a variância em proporção, amostra e regravação.
 - **Entrega:** `output/deriva/`, com tabelas e mapa de calor. Lê as features de C (não os alvos); isso está registrado nas decisões.
-- **O que mostrou:** há deriva. A diferença típica entre amostras é de 9,4%, contra 5,3% entre regravações, mas a composição continua dominando (79% da variância, contra 10% da sessão). Quando a deriva aparece, **o C é a amostra que mais destoa**, e nele o pó tende a apagar um pouco mais rápido (τ cerca de 9% menor, `t50` cerca de 3% menor). É um efeito moderado, do tamanho da diferença entre A e B. Isso não é um defeito a corrigir: é a "sessão nova" que o teste em C precisa enfrentar. Detalhes e cuidados no README, seção "B5: deriva de sessão e a amostra C".
+- **O que mostrou:** há deriva. A diferença típica entre amostras é de 9,4%, contra 5,3% entre regravações, mas a composição continua dominando (79% da variância, contra 10% da sessão). Quando a deriva aparece, **o C é a amostra que mais destoa**, e nele o pó tende a apagar um pouco mais rápido (τ cerca de 9% menor, `t50` cerca de 3% menor). É um efeito moderado, do tamanho da diferença entre A e B. **Depois se viu que a maior parte disso vem da luz nos cantos do vídeo:** o C é a sessão com menos luz de fundo. Detalhes no README, seções "B5: deriva de sessão e a amostra C" e "Anomalias entre amostras".
 
 #### `colinearidade` (`colinearidade.py`)
 - **Pergunta:** quais colunas de entrada dizem a mesma coisa? Colunas redundantes atrapalham a IA quando há poucos dados.
@@ -245,6 +245,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 |---|---|
 | `cli.py` | Recebe o comando `luminescencia <comando>` e chama a etapa certa. |
 | `config.py` + `config.yaml` | Todos os parâmetros num lugar só (corte de 0,5 s, início da janela em 2,5 s, C ≥ −1,35, 3 × ruído etc.). Nenhum desses números fica escrito no código. |
+| `scripts/anomalias_amostras.py` | Busca de anomalias entre as amostras (aquisição, luz de fundo, ordem das regravações, assinatura de cor). Só lê `output/`; os números do README saem dele. |
 | `scripts/cab.py` | Gera `cabecalhos.txt` com o formato e as colunas dos CSVs grandes, para mandar a uma IA de apoio sem enviar os dados inteiros. |
 | `tests/` | 277 testes automáticos com dados sintéticos de resposta conhecida, incluindo um teste de integração da cadeia inteira. |
 
@@ -307,6 +308,12 @@ pytest -q
 
 **Esperando o orientador:** D2 (esquema de validação) e D6 (limite de uma preparação de validação). Depois do aval: preencher `preregistro.aval_orientador`, trocar "provisória" por "decidida" no config e rodar `luminescencia preregistrar`.
 
-**Pendências assumidas:** a deriva de sessão, em que o C apaga um pouco mais rápido (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
+**Achados de 04/11/2026 que pedem decisão** (README, "Anomalias entre amostras"; números em `scripts/anomalias_amostras.py`):
+- o vídeo de treino `RB_05_1_v1a` parece ser de outra composição (`RG_05_1`): assistir e decidir na curadoria;
+- a luz nos cantos do vídeo varia entre regravações e alonga o decaimento medido (o maior artefato conhecido; explica boa parte da deriva entre sessões);
+- o canto preso no piso mínimo de 1,0 deixa 53 vídeos com o decaimento mais rápido do que é;
+- a luz de fundo sobe e o brilho do G cai ao longo das regravações.
+
+**Pendências assumidas:** a deriva de sessão que sobra (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
 
 **Próximos passos, fora do escopo atual:** treinar a IA (k-vizinhos foi adiado), abrir C uma vez e, se o critério passar, a 2ª preparação de validação e o aplicativo.

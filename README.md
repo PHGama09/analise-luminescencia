@@ -432,6 +432,47 @@ Nada muda em `dataset.csv`/`descritores.csv`. Cada módulo lê `output/tabela/` 
 3. Ao ler o erro em C, parte dele pode ser deriva de sessão. O protocolo (§6) já pede comparar o erro por proporção com o sentido da deriva. Um C que "apaga mais rápido" deve puxar a previsão de forma sistemática, e não ao acaso.
 4. **Hipótese não testada:** 22 dos 53 vídeos com o canto do B no piso mínimo da extração são do C (ver P5). Isso afeta a correção do preto e pode explicar parte do desvio. Só um vídeo de controle por sessão resolveria a dúvida (ver "Para resolver de vez" na P5).
 
+**Atualização (04/11/2026, mais tarde no mesmo dia):** a maior parte desse "C apaga mais rápido" **é explicada pelo nível de luz nos cantos do vídeo**, e não pela preparação. O C é a sessão com menos luz nos cantos, e o A a com mais. Descontado o canto, o τ `c0` do R no C passa de −7,2% para −0,5%, e o `t50` de −3,7% para −1,3%. Ver a seção "Anomalias entre amostras" logo abaixo.
+
+#### Anomalias entre amostras (verificação de 04/11/2026)
+
+Todos os números saem de `python scripts/anomalias_amostras.py`, que só lê os CSVs de `output/`. A busca usa só features e metadados (como o `deriva`), nunca desempenho em C. **Nada disto deve ser usado para escolher entradas** (B13: seleção só com A+B).
+
+**1. Um vídeo de treino parece ter a composição errada: `RB_05_1_v1a` (amostra A).** As frações de brilho inicial (R 0,23, G 0,47, B 0,30) batem com `R0.5_G1` (distância 0,0007) e não com a própria `R0.5_B1` (distância 0,10). O B do vídeo tem I0 69, contra cerca de 180 nos 14 irmãos, e os valores ficam no mesmo nível dos 5 vídeos `RG_05_1_*a` (R 44–46, G 97–102, B 59–64). Não é cópia: tamanho e hash diferentes. É o único caso entre os 236 vídeos. **Se confirmado, o alvo desse vídeo de treino está errado.** No `curadoria.csv` ele está como `pendente` (entrou por `incluir_pendentes_ok`). **Ação: assistir ao vídeo e decidir na curadoria.**
+
+**2. O nível de luz nos cantos varia entre regravações e acompanha o decaimento.** Dentro da mesma preparação (mesmo pó, mesma sessão), a luz medida nos cantos (`piso_canto_*`) varia em torno de 2,2 a 2,5 níveis (máx − mín, mediana). Ela sobe junto nos três canais (ρ 0,93 a 0,98) e quase não depende do brilho do pó (ρ com I0: −0,12 a +0,39). Ou seja, é luz geral (ambiente ou nível da câmera), e não o brilho do pó. Mesmo depois da correção do preto, ela acompanha o decaimento:
+- τ `c0` × canto: ρ +0,80 (R), +0,78 (G), +0,63 (B); por nível de canto, +9,9%, +5,3% e +6,0% no τ;
+- `t50` × canto: ρ +0,77, +0,63, +0,46 (+5,8%, +1,7% e +1,9% por nível). Os descritores sem modelo são menos afetados que o τ, sobretudo no G e no B;
+- a cauda corrigida (`final_corr`) também sobe com o canto (ρ +0,71 no G e +0,69 no B). A luz dentro da ROI sobe mais do que nos cantos, então a correção do preto (`canto − offset fixo do controle`) desconta menos do que deveria quando há mais luz.
+
+Hipótese (não testada): luz ambiente durante a gravação, refletida pelo pó (mais claro que os cantos) ou reexcitando o pó. Um deslocamento puro do sensor seria descontado por inteiro e não explicaria essa relação.
+
+**3. Essa luz explica a maior parte da diferença entre sessões.** Canto médio: A 2,87, B 2,13, C 2,06. Com a inclinação estimada só dentro das preparações:
+
+| canal, grandeza | A antes → depois | B antes → depois | C antes → depois |
+|---|---|---|---|
+| R, τ `c0` | +7,7% → +3,3% | +3,9% → −1,0% | −7,2% → −0,5% |
+| R, `t50` | +3,8% → +1,1% | +1,1% → −0,5% | −3,7% → −1,3% |
+| G, τ `c0` | +3,9% → +0,4% | +1,2% → +1,0% | −0,5% → +1,0% |
+| B, τ `c0` | +6,5% → +5,2% | +2,9% → +1,9% | +0,2% → +1,4% |
+
+(Desvio mediano de cada amostra em relação à média da composição.) Sobra uma deriva menor, sobretudo do A no canal B.
+
+**4. Canto preso no piso mínimo da extração.** `extracao.py:153` usa `max(mediana do canto, extracao.piso_minimo = 1,0)`. Quando o canto real fica abaixo de 1,0, o preto corrigido fica alto demais e o decaimento parece mais rápido. Vídeos com canto preso: B 10 (A), 21 (B), 22 (C); R 1/2/4; G 1/2/2. Nos 31 vídeos com o R presente e algum canto preso, o `t50` do R fica em mediana **−11,2%** em relação aos irmãos. Isso explica os vídeos do C que mais destoam: `RB_075_075_v1c/v2c`, `RGB_05_05_05_v2c` e `RG_075_075_v1c/v2c`, todos com canto ≈ 1,00. Sem os presos, a relação canto × decaimento continua (ρ +0,68), então o item 2 não se resume a isso.
+
+**5. A ordem das regravações importa.** A luz do canto sobe ao longo das regravações (ρ mediano +0,25; positiva em 36 de 46 preparações, p = 1,6·10⁻⁴), e o I0 do G cai (positivo em só 7 de 31, p = 0,003). As regravações de uma preparação não são réplicas independentes: a ordem carrega uma tendência.
+
+**6. O que está normal (boas notícias).** O formato dos vídeos é idêntico nas três sessões (MJPG, 1280 × 720, 15 fps, 900 quadros, 60 s), assim como o instante da queda da luz. O vazamento de cor da câmera é estável entre sessões: nos pós únicos, as razões B/G e R/G de `G1.5` e G/B e R/B de `B1.5` variam de 1% a 4%. A qualidade dos ajustes é parecida (R² 0,999 nos três canais e nas três amostras). A ROI do A está deslocada uns 16 px em x e 25 px em y, sem efeito detectado no τ (ρ −0,06).
+
+**O que decidir (nada foi aplicado):**
+1. `RB_05_1_v1a`: assistir e, se for mesmo `RG_05_1`, marcar `incluir = nao` no `curadoria.csv`. Depois rodar `tudo` e regravar a referência com `--gravar-referencia`, porque o dataset muda.
+2. Luz nos cantos, que hoje é o maior artefato conhecido da medição:
+   - (a) na gravação: escurecer o ambiente e gravar um vídeo de controle por sessão (já sugerido na P5);
+   - (b) na análise: uma correção calibrada **só em A+B**, igual para todos e decidida antes de abrir o C;
+   - (c) no mínimo, declarar o artefato e usar o canto como controle de qualidade (nunca como entrada).
+3. Piso mínimo: usar o canto real (sem o `max` com 1,0) na correção do preto e manter o 1,0 só como piso de ruído. É mudança de código: muda o dataset e exige nova referência.
+4. Declarar no protocolo que as regravações têm tendência com a ordem e que parte da "deriva de sessão" é luz de fundo.
+
 ### Q4/B12 — Fim de janela específico do R (`luminescencia janela_r`, v0.13.0)
 
 Só sensibilidade: reajusta os 227 sinais do R (C livre com C ≥ −1,35 e C = 0, mesmo critério simples/dupla do `modelar`, início em 2,5 s) com outras regras de fim de janela. **Nenhum número de `dataset.csv`/`descritores.csv` mudou e o padrão (`modelagem.ruido_k` = 3) não foi alterado.** Saída em `output/janela_r/` (`resumo_regras.csv`, `sinais.csv`, `relatorio_janela_r.txt`). Seção `janela_r` do `config.yaml`.
