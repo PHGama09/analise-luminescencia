@@ -1,6 +1,8 @@
 # Análise de Luminescência por Vídeo
 
-> **Projeto em desenvolvimento (v0.16.5; 277 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). **Ainda faltam** (não feitos): treino da IA, app e o lote Q4 (ver "Pontos em aberto"). O que está marcado como "previsto" abaixo é plano e pode mudar.
+> **Projeto em desenvolvimento (v0.16.5; 277 testes).** Estão implementadas as etapas **1 (auditoria), 2 (ROI), 3 (extração), 4 (consolidação), 5 (pós-processamento), 6a (modelagem), 6b (tabela final)**, a **comparação de modelos** (6c), os **descritores sem modelo** (6d), os **gráficos** (7, agora com log-log, ln I × t e 1/I × t), a escolha de **entradas da IA** (`entradas.py`) e o **comando `tudo` (6e)** (cadeia de etapas, carimbo de versão e conferência de regressão). Também estão feitos o lote Q4 (análises de controle), os blocos 1 e 2 (avaliação sem IA, qualidade, simulação do IC) e a trava do aval do orientador. **Ainda faltam** (não feitos, por decisão): treino da IA e app. O que está marcado como "previsto" abaixo é plano e pode mudar.
+
+> **Novo no projeto?** Comece por [`docs/GUIA_DO_PROJETO.md`](docs/GUIA_DO_PROJETO.md): explica em linguagem simples o que é o projeto, o glossário, o fluxo de trabalho e o porquê de cada funcionalidade. As decisões, com data, estão em [`docs/DECISOES.md`](docs/DECISOES.md).
 
 ## Objetivo
 
@@ -12,11 +14,16 @@ Os dados serão usados para **treinar um modelo de IA**. Por isso a prioridade d
 
 ## Visão geral
 
-O pipeline é dividido em seis programas independentes. Cada um lê a saída do anterior e grava seus resultados em arquivos. Entre as etapas há pausas: você lê o que foi gerado e decide se avança ou se volta para refazer só aquela etapa, sem repetir as outras.
+O trabalho tem quatro fases. Cada etapa lê a saída da anterior e grava seus resultados em `output/<etapa>/`, com um `relatorio_*.txt`. Entre as etapas há pausas: você lê o que foi gerado e decide se avança ou se volta para refazer só aquela etapa, sem repetir as outras.
 
 ```
-[1 Auditoria] → [2 ROI] → [3 Extração] → [4 Consolidação] → [5 Pós-processamento] → [6 Gráficos]
+Fase 1 (vídeos, lenta)   auditar → roi → extrair
+Fase 2 (dados, `tudo`)   consolidar → pos → modelar → tabela → comparar_modelos → descritores → graficos
+Fase 3 (só análise)      offset · deriva · colinearidade · qualidade · janela_r · saturados · ic_simulacao
+Fase 4 (avaliação, sem IA)  entradas.py → avaliacao.py → avaliar_base → preregistrar (bloqueado até o aval) → C, uma vez, no fim
 ```
+
+Diagrama completo e explicação de cada parte: `docs/GUIA_DO_PROJETO.md`, seção 3.
 
 ### Princípios
 
@@ -316,6 +323,15 @@ luminescencia comparar_modelos   # 6c. Compara simples, dupla, esticada e potên
 luminescencia descritores        # 6d. Descritores sem modelo (t50, t10, razões, área): tabela paralela ao dataset
 luminescencia graficos           # 7. Gráficos (semilog, tau cl x c0, resíduos, normalizada, log-log, ln I x t, 1/I x t)
 luminescencia offset             # P5. Testa a suposição do preto por vídeo (offset cantos - ROI); só análise
+luminescencia tudo --conferir    # 6e. Cadeia consolidar ... graficos, carimbo e conferência de regressão (--so-conferir só confere)
+luminescencia deriva             # Q4/B5. Deriva de sessão A/B/C (só análise)
+luminescencia colinearidade --so-treino   # Q4/B13. Colunas redundantes, só A+B (use esta versão para escolher colunas)
+luminescencia janela_r           # Q4/B12. Fim de janela do R (só análise)
+luminescencia saturados          # Q4/B11. Saturados x irmãos (só análise)
+luminescencia qualidade          # Bloco 2B. Viés dos diagnósticos como peso (só análise)
+luminescencia ic_simulacao       # Bloco 2C. IC do erro em C com 1, 2 e 3 preparações (só análise)
+luminescencia avaliar_base       # Bloco 1. Linhas de base sem aprendizado (só A+B; nunca C)
+luminescencia preregistrar       # Bloco 1. Pré-registro do teste em C (bloqueado até preregistro.aval_orientador)
 ```
 
 Os subcomandos aceitam `--config`, `--workers` e `--refazer`. Os nomes podem mudar.
@@ -341,16 +357,27 @@ analise-luminescencia/
 │   ├── entradas.py          # colunas de entrada da IA (D1)
 │   ├── prototipo.py         # protótipo exploratório (ROI + extração + ajuste em poucos vídeos)
 │   ├── consolidacao.py      # etapa 4
-│   └── posprocessamento.py  # etapa 5
+│   ├── posprocessamento.py  # etapa 5
+│   ├── config.py            # leitura do config.yaml
+│   ├── deriva.py            # Q4/B5: deriva de sessão A/B/C (só análise)
+│   ├── colinearidade.py     # Q4/B13: redundância das colunas de entrada (só análise)
+│   ├── janela_r.py          # Q4/B12: fim de janela do R (só análise)
+│   ├── saturados.py         # Q4/B11: saturados x irmãos (só análise)
+│   ├── qualidade.py         # bloco 2B: viés dos diagnósticos (só análise)
+│   ├── ic_simulacao.py      # bloco 2C: simulação do IC do erro em C (só análise)
+│   ├── avaliacao.py         # bloco 1: alvo, dobras por preparação, métricas, trava do C (abrir_c)
+│   ├── linhas_base.py       # bloco 1: linhas de base sem aprendizado (comando avaliar_base)
+│   └── preregistro.py       # bloco 1: pré-registro e trava do aval do orientador
 ├── config.yaml
 ├── curadoria.csv            # suas decisões por vídeo (versionado)
 ├── output/                  # relatórios, ROIs, CSVs (fora do Git)
 ├── scripts/
 │   └── cab.py               # script auxiliar (fora do pacote)
-├── docs/                    # reproduzir.md e protocolo_validacao_rascunho.md (RASCUNHOS, não validados)
-├── tests/                   # test_nomes, test_curadoria, test_consolidacao, test_posprocessamento, test_modelos, test_modelar, test_tabela, test_modelos_extra, test_comparacao_modelos, test_gama, test_entradas, test_graficos, test_c_minimo, test_descritores, test_graficos_transformacoes, test_offset, test_tudo, test_tudo_regressao
+├── docs/                    # GUIA_DO_PROJETO.md, DECISOES.md, protocolo_validacao.md, reproduzir.md, plano_segunda_preparacao.md, preregistro_rascunho.*
+├── tests/                   # 277 testes (pytest -q): um arquivo test_<módulo>.py por módulo, mais test_integracao.py (cadeia inteira com dados sintéticos)
 │   └── referencia/          # referencia.json: referência da conferência de regressão (6e)
 ├── requirements.txt
+├── CHANGELOG.md
 └── README.md
 ```
 

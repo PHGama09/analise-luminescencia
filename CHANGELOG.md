@@ -2,6 +2,10 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [não lançado] — 2026-11-04 (só documentação)
+- `docs/GUIA_DO_PROJETO.md`: guia em linguagem simples (glossário, fluxo, cada funcionalidade).
+- README: ponteiro para o guia, fluxo em 4 fases, todos os comandos, árvore do repositório atualizada.
+
 ## [0.16.5] — 2026-11-04
 - Trava do aval: `preregistro.aval_orientador` (padrão `null`). Sem a data do aval, ou com declaração "provisória", `preregistrar` recusa até com `--forcar` e `abrir_c` fica travado (`preregistro.pendencias_aval`, 5 testes novos).
 - `entradas.bloquear_diagnosticos: true` no `config.yaml` (E1; valor igual ao padrão do código).
