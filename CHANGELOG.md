@@ -2,6 +2,10 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [docs] — 2026-11-05 (análise final da v0.20.0)
+- `scripts/anomalias_amostras.py`: seções 16 (quanto as entradas finais ainda diferenciam as sessões) e 17 (cobertura das composições).
+- README: "Limites que não se resolvem em código" (15 itens) e itens 20 a 23 das anomalias; guia, seção 9; DECISOES com a verificação final.
+
 ## [0.20.0] — 2026-11-05
 - `entradas.max_ausentes_treino` (config: 0,10): tira das entradas as colunas com ausentes demais no treino (A+B); `entradas.colunas_com_ausentes`.
 - `entradas.sem_intensidade` (config: false): tira as colunas em unidade de intensidade; `entradas.eh_intensidade`.
