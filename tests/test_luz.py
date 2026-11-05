@@ -14,7 +14,7 @@ B_VERDADE = 0.05                    # +5% por nível de canto
 P = {**luz.PADROES, "grandezas_canal": ["c0_tau_medio", "md_t50"], "razoes": [], "min_videos": 10, "min_preparacoes": 3}
 
 
-def _dados(seed=1, b_c=0.50):
+def _dados(seed=1, b_c=0.50, ruido=0.002):
     rng = np.random.default_rng(seed)
     ds, de, vid = [], [], []
     for k, prop in enumerate(["P1", "P2", "P3", "P4"]):
@@ -24,7 +24,7 @@ def _dados(seed=1, b_c=0.50):
                 nome = f"{prop}_{am}{n}"
                 canto = rng.uniform(1.0, 4.0)
                 b = b_c if am == "C" else B_VERDADE
-                f = np.exp(b * (canto - 2.0) + rng.normal(0, 0.002))
+                f = np.exp(b * (canto - 2.0) + rng.normal(0, ruido))
                 ds.append({"video": nome, "amostra": am, "proporcao": prop, "excluido_saturacao": False,
                            "sinal_presente_R": True, "sinal_presente_G": False, "sinal_presente_B": False,
                            "R_c0_tau_medio": base * 2 * f, "R_md_I0": 100.0 + n})
@@ -138,3 +138,28 @@ def test_montar_entradas_exige_luz_quando_ligada():
     assert en.montar_entradas(df, dic, cfg, luz=lz)["R_c0_tau_medio"].tolist() == [4.0]
     cfg["entradas"]["corrigir_luz"] = False
     assert en.montar_entradas(df, dic, cfg, luz=lz)["R_c0_tau_medio"].tolist() == [5.0]
+
+
+def test_separacao_cruzada_melhora_com_efeito_de_luz_e_fica_igual_sem():
+    t, cols = _tabela()
+    sep = luz.separacao_cruzada(t, cols, ["A", "B"], P)
+    assert set(sep["coluna"]) == set(cols) and (sep["ganho_pct"] > 50).all()
+    assert (sep["fracao_regravacao_com"] < sep["fracao_regravacao_sem"]).all()
+    ds, de, vid = _dados(b_c=0.0, ruido=0.05)                         # ruído realista (~5% entre regravações)
+    for d in (ds, de):                                                 # tira o efeito da luz de A e B: sem nada a corrigir
+        for col in ("R_c0_tau_medio", "R_md_t50"):
+            if col in d:
+                canto = vid.set_index("video").loc[d["video"], "piso_canto_R"].to_numpy()
+                d[col] = d[col] / np.exp(B_VERDADE * (canto - 2.0))
+    t0, _ = luz.montar_tabela(ds, de, vid, P)
+    sep0 = luz.separacao_cruzada(t0, cols, ["A", "B"], P)
+    # Sem efeito real, a inclinação estimada numa amostra pequena é só ruído: o teste NÃO pode mostrar ganho (aplicar ruído piora).
+    assert (sep0["ganho_pct"] < 1).all()
+
+
+def test_separacao_nao_usa_a_amostra_c():
+    t1, cols = _tabela(b_c=0.50)
+    t2, _ = _tabela(b_c=-3.0)
+    a = luz.separacao_cruzada(t1, cols, ["A", "B"], P)
+    b = luz.separacao_cruzada(t2, cols, ["A", "B"], P)
+    assert np.allclose(a["ganho_pct"], b["ganho_pct"])

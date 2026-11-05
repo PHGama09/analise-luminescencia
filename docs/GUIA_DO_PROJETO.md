@@ -2,7 +2,7 @@
 
 Este guia é para quem nunca viu o projeto: o orientador, um colega, uma banca ou você daqui a seis meses. Não é preciso saber programar para entender as seções 1 a 3. As seções 4 e 5 descrevem cada parte do código. Detalhes técnicos e números estão no `README.md`; as decisões, com data, em `docs/DECISOES.md`.
 
-Versão do código descrita: **0.18.0** (04/11/2026), com 293 testes automáticos.
+Versão do código descrita: **0.19.0** (04/11/2026), com 295 testes automáticos.
 
 ---
 
@@ -163,7 +163,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 - **Por que existe:** a luz de fundo durante a gravação, medida nos cantos do vídeo, alonga o decaimento medido. É o maior artefato conhecido.
 - **Papel:** uma correção **opcional**, em colunas paralelas; nada é sobrescrito.
 - **Objetivo:** estimar, só com A+B e dentro de cada preparação, quanto cada grandeza de forma do decaimento (τ, `t50`, `r_5s`, área...) muda por nível de luz, e descontar isso de todos os vídeos. O C recebe a mesma correção, mas nunca participa da calibração.
-- **Entrega:** `output/tabela/luz.csv` (mesmos nomes de coluna) e, em `output/luz/`, as inclinações e uma **validação cruzada A↔B**, que é a prova honesta de que a correção funciona: calibrada numa amostra, ela reduz a dispersão na outra em 71 de 72 testes. Só vale nas entradas da IA com `entradas.corrigir_luz: true`, que hoje está **desligada**.
+- **Entrega:** `output/tabela/luz.csv` (mesmos nomes de coluna) e, em `output/luz/`, as inclinações e uma **validação cruzada A↔B**, que é a prova honesta de que a correção funciona: calibrada numa amostra, ela reduz a dispersão na outra em 71 de 72 testes. Também mede, de forma cruzada, quanto a correção melhora a **separação entre composições**: melhorou em 36 de 36 colunas (+21,8% em mediana). Por isso a chave `entradas.corrigir_luz` está **ligada** desde a v0.19.0; falta a confirmação do orientador. A chave só muda o que a IA recebe: a leitura dos vídeos e as tabelas originais não mudam. O C recebe a mesma correção, mas nunca participa da calibração.
 - **Limite:** no vermelho, a correção fica mais fraca do que deveria, porque a calibração usa o sinal medido e inclui canais em que o vermelho é só vazamento de cor.
 
 #### `comparar_modelos` (`comparacao_modelos.py`)
@@ -320,7 +320,7 @@ pytest -q
 
 **Achados de 04/11/2026 que pedem decisão** (README, "Anomalias entre amostras"; números em `scripts/anomalias_amostras.py`):
 - **o vídeo de treino `RB_05_1_v1a` parece ser de outra composição (`RG_05_1`): assistir e decidir na curadoria antes de qualquer treino;**
-- a luz nos cantos do vídeo varia entre regravações e alonga o decaimento medido (o maior artefato conhecido; explica boa parte da deriva entre sessões). A correção já existe (`luminescencia luz`), mas está desligada: decidir com ou sem antes do pré-registro;
+- a luz nos cantos do vídeo varia entre regravações e alonga o decaimento medido (o maior artefato conhecido; explica boa parte da deriva entre sessões). A correção existe (`luminescencia luz`) e está ligada desde a v0.19.0; falta a confirmação do orientador antes do pré-registro;
 - o canto preso no piso mínimo de 1,0 foi corrigido na v0.17.0 (efeito pequeno: 53 vídeos no B);
 - medir o preto no anel em volta da amostra foi testado e rejeitado: a luz extra só aparece onde está o pó;
 - a luz de fundo sobe e o brilho do G cai ao longo das regravações.

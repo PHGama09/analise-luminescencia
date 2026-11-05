@@ -131,7 +131,7 @@ entradas:
   descritores: false          # Q3 (03/11/2026): true = acrescenta os descritores sem modelo (descritores.csv) às entradas. Nunca meta, alvo ou canal_ativo_*
   descritores_sem_nao_confiaveis_R: false   # true = tira R_md_t10, R_md_r_20s, R_md_r_40s (lista em descritores.nao_confiaveis_R); false mantém todas (Q2)
   bloquear_diagnosticos: true # E1 (04/11/2026): diagnósticos <canal>_<cl|c0|md>_{ok,r2,rmse,inicio_s,fim_s,n_pontos} nunca entram
-  corrigir_luz: false         # 04/11/2026 (v0.18.0): true = colunas de forma do decaimento corrigidas da luz de fundo (output/tabela/luz.csv, luz.py). Decidir ANTES do pré-registro
+  corrigir_luz: true          # 04/11/2026 (v0.19.0, Pedro): a IA recebe as colunas de forma do decaimento corrigidas da luz de fundo (output/tabela/luz.csv, luz.py). false = valores originais. Confirmar com o orientador antes do pré-registro
 
 descritores:
   # Programa 6d (descritores.py, P3): descritores do decaimento que NÃO dependem de modelo; tabela paralela ao dataset.csv.

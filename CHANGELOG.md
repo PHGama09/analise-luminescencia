@@ -2,6 +2,12 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
+## [0.19.0] — 2026-11-04
+- `entradas.corrigir_luz: true` no `config.yaml` (decisão do Pedro; aguarda o orientador). Padrão do código continua `false`.
+- `luz.separacao_cruzada`: separação entre composições sem e com a correção, cruzada A↔B; `output/luz/separacao.csv` e seção no relatório.
+- Referência de regressão regravada (piso + luz).
+- 2 testes novos em `test_luz.py`.
+
 ## [0.18.0] — 2026-11-04
 - Etapa nova `luminescencia luz` (`luz.py`): correção da luz de fundo em colunas paralelas (`output/tabela/luz.csv`), com inclinações calibradas só em A+B, dentro das preparações e sem saturados; validação cruzada A↔B em `output/luz/`. Entra no `tudo` depois de `descritores` e na conferência de regressão.
 - `entradas.corrigir_luz` (padrão false) troca as colunas de forma do decaimento pelas corrigidas; `entradas.trocar_por_luz`.

@@ -22,9 +22,14 @@ Verificação não circular: validação cruzada deixando uma amostra de treino 
 aplicada na que ficou de fora; o relatório mostra, nela, a dispersão entre regravações e a correlação canto x grandeza, sem e com a
 correção. (Na própria amostra de calibração a correlação vai a zero por construção e não prova nada.)
 
+Segundo teste, também cruzado: SEPARAÇÃO entre composições. Em cada amostra de treino, os vídeos são corrigidos com a inclinação
+estimada nas OUTRAS; depois a variância de ln(grandeza) é dividida em entre composições, entre sessões (preparações da mesma
+composição) e entre regravações. separação = variância entre composições / (sessão + regravação), sem e com a correção. É o que a
+IA precisa: distinguir composições acima do ruído. Só amostras de treino; composições presentes em pelo menos 2 delas.
+
 Saída:
   output/tabela/luz.csv     video, canto_luz e as colunas corrigidas COM O MESMO NOME da original (para trocar em entradas.py)
-  output/luz/inclinacoes.csv, validacao_cruzada.csv, relatorio_luz.txt
+  output/luz/inclinacoes.csv, validacao_cruzada.csv, separacao.csv, relatorio_luz.txt
 Uso nas entradas: entradas.corrigir_luz: true (padrão false). Nada daqui altera dataset.csv ou descritores.csv.
 """
 from __future__ import annotations
@@ -139,7 +144,50 @@ def validacao_cruzada(t: pd.DataFrame, cols: list[str], treino: list[str], p: di
     return pd.DataFrame(linhas)
 
 
-def _relatorio(inc: pd.DataFrame, cv: pd.DataFrame, canto_ref: float, treino: list[str], t: pd.DataFrame) -> str:
+def _decompor(s: pd.DataFrame, y: pd.Series) -> tuple[float, float, float]:
+    """Variância de y entre composições, entre sessões (dentro da composição) e entre regravações (dentro da preparação)."""
+    m_comp = y.groupby(s["proporcao"]).transform("mean")
+    m_prep = y.groupby(s["prep"]).transform("mean")
+    return float(m_comp.var(ddof=0)), float((m_prep - m_comp).var(ddof=0)), float((y - m_prep).var(ddof=0))
+
+
+def separacao_cruzada(t: pd.DataFrame, cols: list[str], treino: list[str], p: dict) -> pd.DataFrame:
+    """Separação entre composições sem e com a correção; cada amostra de treino é corrigida com a inclinação das outras."""
+    linhas = []
+    if len(treino) < 2:
+        return pd.DataFrame(linhas)
+    for col in cols:
+        s = t[linhas_validas(t, col) & t["amostra"].isin(treino)]
+        s = s[s.groupby("prep")["video"].transform("size") >= 2]
+        s = s[s.groupby("proporcao")["amostra"].transform("nunique") >= 2]
+        if s["proporcao"].nunique() < 2:
+            continue
+        corr = pd.Series(np.nan, index=s.index)
+        ok = True
+        for fora in treino:
+            resto = [a for a in treino if a != fora]
+            est = estimar_inclinacao(t, col, resto, p)
+            if est["status"] != "estimada":
+                ok = False
+                break
+            ref = float(t.loc[linhas_validas(t, col) & t["amostra"].isin(resto), "canto_luz"].median())
+            m = s["amostra"] == fora
+            corr[m] = aplicar(s[m], col, est["b"], ref)
+        if not ok:
+            continue
+        c0, se0, r0 = _decompor(s, np.log(s[col].astype(float)))
+        c1, se1, r1 = _decompor(s, np.log(corr))
+        linhas.append({"coluna": col, "n": len(s), "separacao_sem": c0 / (se0 + r0), "separacao_com": c1 / (se1 + r1),
+                       "fracao_sessao_sem": se0 / (c0 + se0 + r0), "fracao_sessao_com": se1 / (c1 + se1 + r1),
+                       "fracao_regravacao_sem": r0 / (c0 + se0 + r0), "fracao_regravacao_com": r1 / (c1 + se1 + r1)})
+    sep = pd.DataFrame(linhas)
+    if len(sep):
+        sep["ganho_pct"] = (sep["separacao_com"] / sep["separacao_sem"] - 1) * 100
+    return sep
+
+
+def _relatorio(inc: pd.DataFrame, cv: pd.DataFrame, canto_ref: float, treino: list[str], t: pd.DataFrame,
+               sep: pd.DataFrame | None = None) -> str:
     L = ["CORREÇÃO DA LUZ DE FUNDO (colunas paralelas; dataset.csv e descritores.csv não mudam)", "=" * 78,
          f"Calibração: amostras {', '.join(treino)} (divisao.treino), sem saturados, dentro das preparações. C não entra.",
          f"canto_ref = {canto_ref:.3f} (mediana do canto médio RGB na calibração). Correção: x * exp(-b * (canto - canto_ref)).",
@@ -164,6 +212,22 @@ def _relatorio(inc: pd.DataFrame, cv: pd.DataFrame, canto_ref: float, treino: li
                                                                               for r in piora.itertuples()))
     else:
         L.append("  (precisa de pelo menos 2 amostras de treino)")
+    L += ["", "Separação entre composições (cruzada: cada amostra de treino corrigida com a inclinação das outras).",
+          "  separação = variância entre composições / (variância entre sessões + entre regravações), em ln(grandeza)."]
+    if sep is not None and len(sep):
+        for r in sep.itertuples():
+            L.append(f"  {r.coluna:18s} {r.separacao_sem:7.2f} -> {r.separacao_com:7.2f}  ({r.ganho_pct:+6.1f}%)   "
+                     f"sessão {r.fracao_sessao_sem * 100:4.1f}% -> {r.fracao_sessao_com * 100:4.1f}%   "
+                     f"regravação {r.fracao_regravacao_sem * 100:4.1f}% -> {r.fracao_regravacao_com * 100:4.1f}%")
+        canal = sep["coluna"].map(lambda c: "razões" if c.startswith("razao_") else c[0])
+        L += ["", f"Resumo: a separação melhorou em {int((sep['ganho_pct'] > 0).sum())} de {len(sep)} colunas; ganho mediano "
+                  f"{sep['ganho_pct'].median():+.1f}%; por grupo: "
+                  + ", ".join(f"{g} {v:+.1f}%" for g, v in sep.groupby(canal)["ganho_pct"].median().items()) + "."]
+        pior = sep[sep["ganho_pct"] < 0]
+        if len(pior):
+            L.append("Colunas em que a separação PIOROU: " + ", ".join(f"{r.coluna} ({r.ganho_pct:+.1f}%)" for r in pior.itertuples()))
+    else:
+        L.append("  (precisa de pelo menos 2 amostras de treino e composições presentes em mais de uma)")
     L += ["", "Canto médio por amostra (mediana): " + str(t.groupby("amostra")["canto_luz"].median().round(2).to_dict()),
           "Limites: correção empírica, causa não confirmada (teste de luz acesa x apagada pendente); supõe efeito linear e igual",
           "entre composições; não remove toda a diferença entre sessões. Decidir com/sem ANTES do pré-registro."]
@@ -192,14 +256,16 @@ def rodar(cfg: dict, pasta_tabela=None, pasta_consolidacao=None, saida=None) -> 
     for r in inc.itertuples():
         luz[r.coluna] = aplicar(t, r.coluna, r.b, canto_ref).round(4)
     cv = validacao_cruzada(t, cols, treino, p)
+    sep = separacao_cruzada(t, cols, treino, p)
 
     out.mkdir(parents=True, exist_ok=True)
     tab.mkdir(parents=True, exist_ok=True)
     luz.to_csv(tab / "luz.csv", index=False, encoding=ENC)
     inc.assign(canto_ref=canto_ref).to_csv(out / "inclinacoes.csv", index=False, encoding=ENC)
     cv.to_csv(out / "validacao_cruzada.csv", index=False, encoding=ENC)
-    texto = _relatorio(inc, cv, canto_ref, treino, t)
+    sep.to_csv(out / "separacao.csv", index=False, encoding=ENC)
+    texto = _relatorio(inc, cv, canto_ref, treino, t, sep)
     (out / "relatorio_luz.txt").write_text(texto, encoding="utf-8")
     print(texto)
-    print(f"Arquivos: {tab / 'luz.csv'}; {out}/inclinacoes.csv, validacao_cruzada.csv, relatorio_luz.txt")
+    print(f"Arquivos: {tab / 'luz.csv'}; {out}/inclinacoes.csv, validacao_cruzada.csv, separacao.csv, relatorio_luz.txt")
     return 0
