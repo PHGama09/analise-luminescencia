@@ -91,14 +91,18 @@ def ordem(x, de):
 
 
 def piso_minimo(v, x):
-    print("\n== 5. Canto preso no piso mínimo da extração (<= 1,01; extracao.piso_minimo = 1,0)")
+    print("\n== 5. Canto abaixo do piso mínimo da extração (extracao.piso_minimo = 1,0)")
     for c in CANAIS:
-        print(f"  {c}:", {a: int((v[v["amostra"] == a][f"piso_canto_{c}"] <= 1.01).sum()) for a in "ABC"})
+        if f"canto_fonte_{c}" in v:          # v0.17.0: consolidacao.canto_sem_piso usa o canto real
+            print(f"  {c}: fontes do canto", v.groupby("amostra")[f"canto_fonte_{c}"].value_counts().unstack(fill_value=0).to_dict("index"))
+        else:
+            print(f"  {c} (preso em 1,0):", {a: int((v[v["amostra"] == a][f"piso_canto_{c}"] <= 1.01).sum()) for a in "ABC"})
     s = x[x["prop_R"] > 0].dropna(subset=["R_md_t50"]).copy()
     s["preso"] = (s[[f"piso_canto_{c}" for c in CANAIS]] <= 1.01).any(axis=1)
     d = np.log(s["R_md_t50"]) - np.log(s["R_md_t50"]).groupby(s["prep"]).transform("median")
     sem = s[~s["preso"]]
     sem = sem[sem.groupby("prep")["video"].transform("size") >= 3]
+    print("  (os 'presos' abaixo incluem cantos reais perto de 1,0 no R/G: o desvio deles é o efeito da luz da seção 2, não do piso)")
     print(f"  t50 do R nos vídeos presos: mediana {np.expm1(d[s['preso']].median()) * 100:+.1f}% em relação aos irmãos (n={int(s['preso'].sum())}); "
           f"sem os presos, rho canto x t50 continua {spearmanr(dentro(sem, 'R_md_t50'), dentro(sem, 'piso_canto_R', False))[0]:+.2f}")
 

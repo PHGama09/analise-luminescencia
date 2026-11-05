@@ -21,6 +21,17 @@ Correção do preto por vídeo (consolidacao.piso: video)
   vale igual para todas as sessões. Os valores brutos continuam nas colunas sem sufixo; os corrigidos vêm como *_corr.
   Com consolidacao.piso: referencia usa o piso fixo do controle (piso_ref_*) e a correção por sessão fica desligada.
 
+Canto sem o piso mínimo (consolidacao.canto_sem_piso, decisão de 04/11/2026)
+  A extração grava piso_canto_* = max(mediana do canto, extracao.piso_minimo = 1,0). O 1,0 é um piso de RUÍDO; usado como
+  preto, ele deixa o preto alto demais quando o canto real é menor (só acontece no B) e o decaimento parece mais rápido.
+  Com canto_sem_piso: true, a consolidação relê o canto quadro a quadro do CSV de cada vídeo (sem reler o vídeo) e usa a
+  mediana real no decaimento. Um canto abaixo do piso só é aceito se passar nas três travas (senão volta ao piso, com o
+  motivo em canto_fonte_*):
+      quadros    pelo menos canto_min_quadros quadros no decaimento;
+      estável    |mediana da 1ª metade - mediana da 2ª metade| <= canto_max_variacao (um preto real não muda no vídeo);
+      plausível  mediana >= canto_minimo_absoluto.
+  Canto acima do piso fica IGUAL ao da extração. O valor da extração continua em piso_canto_extracao_*.
+
 Conferência (no relatório): em cada grupo de mesma proporção e mesma amostra (5 regravações), compara a dispersão do nível
 final com o piso fixo e com o piso por vídeo, só nos canais cujo pó está presente. Se a correção funciona, a dispersão cai.
 """
@@ -38,7 +49,8 @@ CANAIS = ["R", "G", "B"]
 
 
 def parametros(cfg: dict) -> dict:
-    p = {"piso": "video", "incluir_pendentes_ok": True}
+    p = {"piso": "video", "incluir_pendentes_ok": True, "canto_sem_piso": False, "canto_min_quadros": 100,
+         "canto_max_variacao": 0.3, "canto_minimo_absoluto": 0.3}
     p.update(cfg.get("consolidacao", {}) or {})
     if p["piso"] not in ("video", "referencia"):
         raise ValueError("consolidacao.piso deve ser 'video' ou 'referencia'")
@@ -89,6 +101,52 @@ def _identificar(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, list[str]]:
     ok = [i for i, x in enumerate(linhas) if x]
     meta = pd.DataFrame([linhas[i] for i in ok], index=df.index[ok])
     return pd.concat([meta, df.loc[df.index[ok]]], axis=1), avisos
+
+
+def canto_do_video(d: pd.DataFrame, corte: float, piso_minimo: float, p: dict) -> dict[str, tuple[float | None, str]]:
+    """Canto por canal no decaimento: (valor, fonte). Fonte 'canto' (>= piso), 'canto_abaixo_do_piso' (passou nas travas)
+    ou 'piso_minimo: <motivos>' (não passou; usa o piso, como a extração)."""
+    dec = d[d["tempo_s"] >= corte]
+    meio = dec["tempo_s"].median() if len(dec) else np.nan
+    saida = {}
+    for c in CANAIS:
+        x = dec[f"canto_{c}"].dropna() if f"canto_{c}" in dec else pd.Series(dtype=float)
+        if not len(x):
+            saida[c] = (None, "sem_dados")
+            continue
+        med = float(x.median())
+        if med >= piso_minimo:
+            saida[c] = (round(med, 2), "canto")
+            continue
+        t = dec.loc[x.index, "tempo_s"]
+        a, b = x[t < meio], x[t >= meio]
+        variacao = abs(float(a.median()) - float(b.median())) if len(a) and len(b) else np.inf
+        motivos = []
+        if len(x) < p["canto_min_quadros"]:
+            motivos.append(f"poucos quadros ({len(x)})")
+        if not variacao <= p["canto_max_variacao"]:
+            motivos.append(f"instável ({variacao:.2f})")
+        if med < p["canto_minimo_absoluto"]:
+            motivos.append(f"abaixo do mínimo absoluto ({med:.2f})")
+        saida[c] = (round(piso_minimo, 2), "piso_minimo: " + "; ".join(motivos)) if motivos else (round(med, 2), "canto_abaixo_do_piso")
+    return saida
+
+
+def recalcular_cantos(df: pd.DataFrame, pasta_ext: Path, corte: float, piso_minimo: float, p: dict) -> pd.DataFrame:
+    """Troca piso_canto_* pelo canto real (canto_do_video); guarda o da extração em piso_canto_extracao_* e a fonte em canto_fonte_*."""
+    df = df.copy()
+    for c in CANAIS:
+        df[f"piso_canto_extracao_{c}"] = df[f"piso_canto_{c}"]
+        df[f"canto_fonte_{c}"] = "resumo (sem CSV)"
+    for i, l in df.iterrows():
+        arq = Path(pasta_ext) / str(l["arquivo_csv"])
+        if not arq.is_file():
+            continue
+        for c, (valor, fonte) in canto_do_video(pd.read_csv(arq, encoding="utf-8-sig"), corte, piso_minimo, p).items():
+            if valor is not None:
+                df.at[i, f"piso_canto_{c}"] = valor
+            df.at[i, f"canto_fonte_{c}"] = fonte
+    return df
 
 
 def corrigir_preto(df: pd.DataFrame, controle: pd.Series | None, modo: str) -> pd.DataFrame:
@@ -183,6 +241,20 @@ def rodar(cfg: dict, pasta_extracao=None, saida=None, curadoria=None) -> int:
     if not len(aceitos):
         print("Nenhum vídeo aceito.")
         return 1
+    if p["canto_sem_piso"]:
+        corte = float(cfg.get("protocolo", {}).get("instante_queda_s", 0.5))
+        piso_minimo = float((cfg.get("extracao", {}) or {}).get("piso_minimo", 1.0))
+        aceitos = recalcular_cantos(aceitos, pasta_ext, corte, piso_minimo, p)
+        if controle is not None:
+            controle = recalcular_cantos(controle.to_frame().T, pasta_ext, corte, piso_minimo, p).iloc[0]
+        for c in CANAIS:
+            fontes = aceitos[f"canto_fonte_{c}"]
+            abaixo = aceitos[fontes == "canto_abaixo_do_piso"]
+            recusados = aceitos[fontes.str.startswith("piso_minimo")]
+            if len(abaixo) or len(recusados):
+                avisos.append(f"canto {c}: {len(abaixo)} vídeo(s) com canto real abaixo do piso usado "
+                              f"(por amostra {abaixo.groupby('amostra').size().to_dict()}); {len(recusados)} recusado(s) pelas travas"
+                              + (f": {', '.join(recusados['video'] + ' (' + recusados[f'canto_fonte_{c}'] + ')')}" if len(recusados) else ""))
     aceitos = corrigir_preto(aceitos, controle, p["piso"])
     nomes_dup = aceitos["video"][aceitos["video"].duplicated(keep=False)].unique()
     for n in nomes_dup:

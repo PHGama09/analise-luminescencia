@@ -2,7 +2,12 @@
 
 Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada decisão em `docs/DECISOES.md`.
 
-## [não lançado] — 2026-11-04 (só documentação)
+## [0.17.0] — 2026-11-04
+- `consolidacao.canto_sem_piso` (padrão no config: true): o preto usa o canto real, relido dos CSVs por vídeo, sem o `max` com `extracao.piso_minimo`. Três travas (`canto_min_quadros`, `canto_max_variacao`, `canto_minimo_absoluto`); colunas novas `piso_canto_extracao_*` e `canto_fonte_*` em `videos.csv`. Muda 53 vídeos no B; a referência de regressão precisa ser regravada.
+- 6 testes novos em `test_consolidacao.py`; tolerância de `test_integracao.py::test_preto_por_video_recuperado` de 0,01 para 0,02 (o canto agora vem dos quadros com ruído).
+- README: pendências antes do treino em destaque no topo; anomalias 4, 7 e 8 (piso corrigido, anel rejeitado, regravação).
+
+## [docs] — 2026-11-04 (só documentação)
 - `docs/GUIA_DO_PROJETO.md`: guia em linguagem simples (glossário, fluxo, cada funcionalidade).
 - `scripts/anomalias_amostras.py` e seção "Anomalias entre amostras" no README: possível rótulo trocado em `RB_05_1_v1a`, luz nos cantos x decaimento, canto preso no piso mínimo, tendência com a ordem das regravações.
 - README: seção "B5: deriva de sessão e a amostra C" (o C destoa mais quando há deriva e apaga um pouco mais rápido; cuidados).

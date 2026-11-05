@@ -1,4 +1,5 @@
 """Testes da consolidação: quem entra, correção do preto, nomes aprovados. Rode: pytest"""
+import numpy as np
 import pandas as pd
 
 from luminescencia.consolidacao import avaliar_correcao, corrigir_preto, selecionar
@@ -69,3 +70,54 @@ def test_avaliacao_mostra_queda_da_dispersao_quando_a_correcao_ajuda():
     df = corrigir_preto(pd.DataFrame(linhas), controle, "video")
     a = avaliar_correcao(df)["G"]
     assert a["dp_piso_video"] < a["dp_piso_fixo"] and a["dp_piso_video"] < 1e-9
+
+
+# ------------------------------------------------------------------- canto sem o piso mínimo (04/11/2026)
+
+from luminescencia.consolidacao import canto_do_video, parametros, recalcular_cantos  # noqa: E402
+
+P_CANTO = parametros({"consolidacao": {"canto_sem_piso": True}})
+
+
+def _quadros(canto_b, n=200, segunda_metade=None):
+    t = np.linspace(0.0, 60.0, n)
+    b = np.full(n, canto_b, dtype=float)
+    if segunda_metade is not None:
+        b[t >= np.median(t[t >= 0.5])] = segunda_metade
+    return pd.DataFrame({"tempo_s": t, "canto_R": 2.0, "canto_G": 1.5, "canto_B": b})
+
+
+def test_canto_acima_do_piso_fica_igual():
+    r = canto_do_video(_quadros(2.345), 0.5, 1.0, P_CANTO)
+    assert r["R"] == (2.0, "canto") and r["B"] == (2.35, "canto")
+
+
+def test_canto_real_abaixo_do_piso_e_usado():
+    assert canto_do_video(_quadros(0.72), 0.5, 1.0, P_CANTO)["B"] == (0.72, "canto_abaixo_do_piso")
+
+
+def test_canto_instavel_volta_ao_piso():
+    valor, fonte = canto_do_video(_quadros(0.4, segunda_metade=0.95), 0.5, 1.0, P_CANTO)["B"]
+    assert valor == 1.0 and fonte.startswith("piso_minimo") and "instável" in fonte
+
+
+def test_canto_implausivel_ou_com_poucos_quadros_volta_ao_piso():
+    v1, f1 = canto_do_video(_quadros(0.1), 0.5, 1.0, P_CANTO)["B"]
+    v2, f2 = canto_do_video(_quadros(0.7, n=40), 0.5, 1.0, P_CANTO)["B"]
+    assert (v1, v2) == (1.0, 1.0) and "mínimo absoluto" in f1 and "poucos quadros" in f2
+
+
+def test_recalcular_troca_o_canto_e_o_preto_do_video(tmp_path):
+    _quadros(0.72).to_csv(tmp_path / "v.csv", index=False, encoding="utf-8-sig")
+    df = _df(100, 10, canto=1.0, ref=1.6).iloc[:1].assign(arquivo_csv="v.csv")
+    novo = recalcular_cantos(df, tmp_path, 0.5, 1.0, P_CANTO)
+    assert novo["piso_canto_B"].iloc[0] == 0.72 and novo["piso_canto_extracao_B"].iloc[0] == 1.0
+    assert novo["canto_fonte_B"].iloc[0] == "canto_abaixo_do_piso"
+    controle = pd.Series({**{f"piso_canto_{c}": 2.5 for c in "RGB"}, **{f"piso_ref_{c}": 1.6 for c in "RGB"}})
+    assert corrigir_preto(novo, controle, "video")["piso_video_B"].iloc[0] == round(0.72 - 0.9, 3)
+
+
+def test_sem_csv_mantem_o_valor_da_extracao(tmp_path):
+    df = _df(100, 10, canto=1.0, ref=1.6).iloc[:1].assign(arquivo_csv="nao_existe.csv")
+    novo = recalcular_cantos(df, tmp_path, 0.5, 1.0, P_CANTO)
+    assert novo["piso_canto_B"].iloc[0] == 1.0 and novo["canto_fonte_B"].iloc[0] == "resumo (sem CSV)"

@@ -203,7 +203,9 @@ def test_preto_por_video_recuperado(cadeia):
     vd = cadeia["videos"].set_index("video")
     for nome, x in cadeia["verdade"].items():
         for c in CANAIS:
-            assert vd.loc[nome, f"piso_video_{c}"] == pytest.approx(x["piso"][c], abs=0.01)
+            # abs=0.02: desde a v0.17.0 (consolidacao.canto_sem_piso) o canto é relido quadro a quadro, com o ruído do gerador
+            # (dp 0,05), e arredondado a 2 casas como na extração; antes vinha exato do resumo sintético.
+            assert vd.loc[nome, f"piso_video_{c}"] == pytest.approx(x["piso"][c], abs=0.02)
 
 
 def test_tau_recuperado(cadeia):

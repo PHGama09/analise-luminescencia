@@ -89,6 +89,10 @@ consolidacao:
   # Programa 4 (consolidacao.py).
   piso: video                 # video = preto corrigido por vídeo (cantos do vídeo - diferença canto/ROI do controle); referencia = piso fixo do controle
   incluir_pendentes_ok: true  # incluir = pendente com auditoria ok entra; pendente com alerta fica de fora até você decidir
+  canto_sem_piso: true        # 04/11/2026: preto pelo canto REAL (relido dos CSVs por vídeo), sem o max com extracao.piso_minimo; false = como antes
+  canto_min_quadros: 100      # trava 1: canto abaixo do piso só vale com pelo menos isto de quadros no decaimento
+  canto_max_variacao: 0.3     # trava 2: |mediana 1ª metade - 2ª metade| do canto (nível); acima disto o canto é instável e volta ao piso
+  canto_minimo_absoluto: 0.3  # trava 3: canto abaixo disto não é plausível e volta ao piso
 
 posprocessamento:
   # Programa 5 (posprocessamento.py). Não altera valores; só recorta a janela e sinaliza.

@@ -2,7 +2,7 @@
 
 Este guia é para quem nunca viu o projeto: o orientador, um colega, uma banca ou você daqui a seis meses. Não é preciso saber programar para entender as seções 1 a 3. As seções 4 e 5 descrevem cada parte do código. Detalhes técnicos e números estão no `README.md`; as decisões, com data, em `docs/DECISOES.md`.
 
-Versão do código descrita: **0.16.5** (04/11/2026), com 277 testes automáticos.
+Versão do código descrita: **0.17.0** (04/11/2026), com 283 testes automáticos.
 
 ---
 
@@ -129,7 +129,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 #### `consolidar` (`consolidacao.py`)
 - **Por que existe:** a extração mede cada vídeo isoladamente. É preciso juntar só os aceitos e corrigir o preto **por vídeo**, porque o nível de preto muda de sessão para sessão.
 - **Papel:** junta os vídeos e corrige o preto.
-- **Objetivo:** aplicar o `curadoria.csv` (quem entra e quem sai) e calcular o preto de cada vídeo: o canto do próprio vídeo, menos a diferença canto/ROI medida no vídeo de controle.
+- **Objetivo:** aplicar o `curadoria.csv` (quem entra e quem sai) e calcular o preto de cada vídeo: o canto do próprio vídeo, menos a diferença canto/ROI medida no vídeo de controle. Desde a v0.17.0, o canto usado é o real, mesmo abaixo de 1,0, se passar em três travas de segurança.
 - **Entrega:** `output/consolidacao/videos.csv` (um vídeo por linha), `series.csv` (todos os quadros) e um relatório de quem entrou, quem ficou de fora e por quê.
 
 #### `pos` (`posprocessamento.py`)
@@ -309,9 +309,10 @@ pytest -q
 **Esperando o orientador:** D2 (esquema de validação) e D6 (limite de uma preparação de validação). Depois do aval: preencher `preregistro.aval_orientador`, trocar "provisória" por "decidida" no config e rodar `luminescencia preregistrar`.
 
 **Achados de 04/11/2026 que pedem decisão** (README, "Anomalias entre amostras"; números em `scripts/anomalias_amostras.py`):
-- o vídeo de treino `RB_05_1_v1a` parece ser de outra composição (`RG_05_1`): assistir e decidir na curadoria;
+- **o vídeo de treino `RB_05_1_v1a` parece ser de outra composição (`RG_05_1`): assistir e decidir na curadoria antes de qualquer treino;**
 - a luz nos cantos do vídeo varia entre regravações e alonga o decaimento medido (o maior artefato conhecido; explica boa parte da deriva entre sessões);
-- o canto preso no piso mínimo de 1,0 deixa 53 vídeos com o decaimento mais rápido do que é;
+- o canto preso no piso mínimo de 1,0 foi corrigido na v0.17.0 (efeito pequeno: 53 vídeos no B);
+- medir o preto no anel em volta da amostra foi testado e rejeitado: a luz extra só aparece onde está o pó;
 - a luz de fundo sobe e o brilho do G cai ao longo das regravações.
 
 **Pendências assumidas:** a deriva de sessão que sobra (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
