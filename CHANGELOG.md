@@ -4,6 +4,7 @@ Versões a partir do histórico do Git e dos trechos de README. Detalhes de cada
 
 ## [não lançado] — 2026-11-04 (só documentação)
 - `docs/GUIA_DO_PROJETO.md`: guia em linguagem simples (glossário, fluxo, cada funcionalidade).
+- README: seção "B5: deriva de sessão e a amostra C" (o C destoa mais quando há deriva e apaga um pouco mais rápido; cuidados).
 - README: ponteiro para o guia, fluxo em 4 fases, todos os comandos, árvore do repositório atualizada.
 
 ## [0.16.5] — 2026-11-04

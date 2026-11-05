@@ -415,6 +415,23 @@ Dependências atuais: `opencv-python`, `numpy`, `pandas`, `tqdm`, `pyyaml`, `sci
 
 Nada muda em `dataset.csv`/`descritores.csv`. Cada módulo lê `output/tabela/` e grava em `output/<nome>/` com relatório `.txt`; nenhum número ou conclusão está no código (as frases do relatório são montadas dos CSVs; os testes usam dados sintéticos de resposta conhecida). Seções novas no `config.yaml`: `deriva`, `colinearidade`. Testes: 108 + 21 = **129** (esperado; ver "Não verificado").
 
+#### B5: deriva de sessão e a amostra C (o que os dados mostram)
+
+**Do `relatorio_deriva.txt` (calculado por `deriva.py`):** há deriva de sessão. São 166 de 332 células (proporção × canal × grandeza) com deriva detectada, quando o acaso daria cerca de 17. A diferença relativa mediana entre amostras é de **9,4%**, contra **5,3%** de CV mediano entre regravações. Mesmo assim, a composição domina: **79%** da variância está entre proporções e **10%** entre amostras. Normalizar por sessão removeria pouco, só 13% da variância entre amostras.
+
+**É o C que destoa?** Para responder, calculei a partir de `output/deriva/deriva_celulas.csv` qual amostra fica mais longe da média das outras duas em cada célula (em log; verificação de 04/11/2026; o `deriva.py` ainda não calcula isso):
+- **Em todas as células, C e A destoam com a mesma frequência:** C 129, A 128, B 75 de 332.
+- **Nas células com deriva detectada, o C destoa mais que o acaso:** 89 de 166 (54%; o acaso daria 33%). Nas grandezas de decaimento (`t50`, `r_5s`, `auc_10s`, τ, razão de `t50`), são 61 de 106 (58%).
+- **Sentido: no C o pó tende a apagar um pouco mais rápido.** O τ `c0` do C fica abaixo da média de A e B em 29 de 42 células (mediana −9,1%), e o `t50` em 26 de 42 (−3,1%). No `r_5s` e no `auc_10s` a diferença é de só −1,5% e −1,6%.
+- **Tamanho: o efeito é moderado, não um desvio grande.** Nas grandezas de decaimento, a distância mediana do C à média de A e B (4,6%) é igual à distância entre A e B (4,8%) e menor que o CV mediano entre regravações (5,7%).
+- **Sem separar por composição, no R é o A que difere:** τ `c0` mediano de A 7,3 s, B 6,2 s e C 6,2 s. Outro fato da sessão: o C não tem nenhum saturado (A 5, B 4).
+
+**O que isso significa:**
+1. Isso é exatamente o que o teste em C precisa medir: uma preparação nova, gravada em outra sessão. **Não é motivo para corrigir ou mexer no C.** Corrigir usando o C seria usar a própria validação.
+2. **Não use este achado para escolher entradas.** A seleção de colunas é feita só com A+B (B13). A D4 já tinha escolhido os descritores por outro motivo: são mais repetíveis em A+B.
+3. Ao ler o erro em C, parte dele pode ser deriva de sessão. O protocolo (§6) já pede comparar o erro por proporção com o sentido da deriva. Um C que "apaga mais rápido" deve puxar a previsão de forma sistemática, e não ao acaso.
+4. **Hipótese não testada:** 22 dos 53 vídeos com o canto do B no piso mínimo da extração são do C (ver P5). Isso afeta a correção do preto e pode explicar parte do desvio. Só um vídeo de controle por sessão resolveria a dúvida (ver "Para resolver de vez" na P5).
+
 ### Q4/B12 — Fim de janela específico do R (`luminescencia janela_r`, v0.13.0)
 
 Só sensibilidade: reajusta os 227 sinais do R (C livre com C ≥ −1,35 e C = 0, mesmo critério simples/dupla do `modelar`, início em 2,5 s) com outras regras de fim de janela. **Nenhum número de `dataset.csv`/`descritores.csv` mudou e o padrão (`modelagem.ruido_k` = 3) não foi alterado.** Saída em `output/janela_r/` (`resumo_regras.csv`, `sinais.csv`, `relatorio_janela_r.txt`). Seção `janela_r` do `config.yaml`.

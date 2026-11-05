@@ -186,6 +186,7 @@ Cada item responde: **por que existe**, **qual o papel** no fluxo, **qual o obje
 - **Pergunta:** A, B e C diferem de forma sistemática, a ponto de a IA aprender a sessão em vez da composição?
 - **Como responde:** compara, por composição e canal, as médias de cada amostra, a variação entre regravações e testes estatísticos para amostras pequenas, e decompõe a variância em proporção, amostra e regravação.
 - **Entrega:** `output/deriva/`, com tabelas e mapa de calor. Lê as features de C (não os alvos); isso está registrado nas decisões.
+- **O que mostrou:** há deriva. A diferença típica entre amostras é de 9,4%, contra 5,3% entre regravações, mas a composição continua dominando (79% da variância, contra 10% da sessão). Quando a deriva aparece, **o C é a amostra que mais destoa**, e nele o pó tende a apagar um pouco mais rápido (τ cerca de 9% menor, `t50` cerca de 3% menor). É um efeito moderado, do tamanho da diferença entre A e B. Isso não é um defeito a corrigir: é a "sessão nova" que o teste em C precisa enfrentar. Detalhes e cuidados no README, seção "B5: deriva de sessão e a amostra C".
 
 #### `colinearidade` (`colinearidade.py`)
 - **Pergunta:** quais colunas de entrada dizem a mesma coisa? Colunas redundantes atrapalham a IA quando há poucos dados.
@@ -306,6 +307,6 @@ pytest -q
 
 **Esperando o orientador:** D2 (esquema de validação) e D6 (limite de uma preparação de validação). Depois do aval: preencher `preregistro.aval_orientador`, trocar "provisória" por "decidida" no config e rodar `luminescencia preregistrar`.
 
-**Pendências assumidas:** o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
+**Pendências assumidas:** a deriva de sessão, em que o C apaga um pouco mais rápido (declarar ao ler o erro em C, sem corrigir o C); o vídeo `C/1/RGB_05_05_05_v1a` (decidir no fim); os saturados (rever); a suposição do preto (só mitigada pelo `offset`); a composição `G0.5_B1`, que não tem amostra A; e `R1.5`, que não tem sinal em G e B (ausência real, que nunca deve ser preenchida com a proporção).
 
 **Próximos passos, fora do escopo atual:** treinar a IA (k-vizinhos foi adiado), abrir C uma vez e, se o critério passar, a 2ª preparação de validação e o aplicativo.
